@@ -154,8 +154,13 @@ venv.bak/
 # mkdocs documentation
 /site
 
-# mypy
+# MyPy Cache
 .mypy_cache/
+
+# Project data
+data/
+!data/.gitkeep
+configs/*.yaml
 .dmypy.json
 dmypy.json
 
