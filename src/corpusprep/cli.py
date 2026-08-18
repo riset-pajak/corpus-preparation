@@ -157,6 +157,41 @@ def add_pdf(files: tuple[str, ...], data_dir: str) -> None:
             console.print(f"  [yellow]-[/] {msg}")
 
 
+# ---- add-url -------------------------------------------------------------
+
+@main.command("add-url")
+@click.argument("urls", nargs=-1, required=True)
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def add_url(urls: tuple[str, ...], data_dir: str) -> None:
+    """Unduh regulasi dari URL dan simpan ke data/raw/."""
+    root = Path(data_dir).resolve()
+    _ensure_dirs(root)
+    raw_dir = _get_data_dirs(root)["raw"]
+
+    from corpusprep.collectors.web import save_web_regulation
+
+    saved: list[str] = []
+    failed: list[str] = []
+
+    for url in urls:
+        try:
+            artifacts = save_web_regulation(url, raw_dir)
+            saved.extend(f"{item.kind}: {item.path.name}" for item in artifacts)
+            console.print(f"\n[green bold]OK[/] {url}")
+            for item in artifacts:
+                console.print(f"  [green]+[/] {item.kind}: {item.path.name}")
+        except Exception as exc:
+            failed.append(f"{url} -- {exc}")
+            console.print(f"\n[red bold]FAIL[/] {url} -- {exc}")
+
+    if saved:
+        console.print(f"\n[green bold]{len(saved)} artefak disimpan[/] ke [cyan]data/raw/[/]")
+    if failed:
+        console.print(f"\n[yellow]{len(failed)} URL gagal[/]")
+        for msg in failed:
+            console.print(f"  [yellow]-[/] {msg}")
+
+
 # ---- process -------------------------------------------------------------
 
 @main.command()

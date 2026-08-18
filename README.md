@@ -28,6 +28,9 @@ Membuat struktur folder `data/raw/`, `data/processed/`, `data/output/`, dan `con
 # Tambahkan PDF/DOCX ke data/raw/
 riset-pajak add-pdf PMK-68-PMK-03-2024.pdf
 riset-pajak add-pdf file1.pdf file2.docx /path/to/anything.pdf
+
+# Unduh dari URL regulasi dan simpan HTML + lampiran PDF ke data/raw/
+riset-pajak add-url https://pajak.go.id/id/peraturan/...
 ```
 
 ### Proses Corpus
@@ -64,6 +67,7 @@ Setelah `process`, tersedia:
 - `data/output/corpus.jsonl` -- satu dokumen per baris, siap untuk embedding/training
 - `data/output/corpus.md`    -- format markdown untuk human review
 - `data/processed/*.txt`     -- teks mentah hasil ekstraksi
+- `data/raw/*.html|*.pdf`    -- sumber asli hasil ingest dari web atau file lokal
 
 ## Arsitektur
 

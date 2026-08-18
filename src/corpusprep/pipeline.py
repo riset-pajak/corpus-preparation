@@ -13,6 +13,7 @@ from corpusprep.metadata import extract_identifier, extract_title
 def process_file(file_path: Path, processed_dir: str) -> "RegulationDoc":
     """Proses satu file menjadi RegulationDoc."""
     from corpusprep.models import RegulationDoc, Section
+    from bs4 import BeautifulSoup
 
     ext = file_path.suffix.lower()
 
@@ -22,6 +23,10 @@ def process_file(file_path: Path, processed_dir: str) -> "RegulationDoc":
         raw_text = extract_text_from_pdf(file_path)
     elif ext == ".docx":
         raw_text = extract_text_from_docx(file_path)
+    elif ext in {".html", ".htm"}:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
+            html = f.read()
+        raw_text = BeautifulSoup(html, "html.parser").get_text("\n")
     else:
         with open(file_path, encoding="utf-8", errors="replace") as f:
             raw_text = f.read()
