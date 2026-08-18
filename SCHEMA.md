@@ -1,7 +1,7 @@
 # SCHEMA.md -- Corpus & Database Schema
 
-**Last Updated:** 2026-04-08
-**Status:** Phase 1 implemented (JSONL), Phase 2 planned (SQLite)
+**Last Updated:** 2026-08-18
+**Status:** Phase 1 implemented (JSONL + HTML ingest), Phase 2 planned (SQLite)
 
 ---
 
@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS regulations (
     replaced_by        TEXT REFERENCES regulations(full_identifier),
     full_text          TEXT,                    -- teks lengkap
     source_path        TEXT,                    -- path file asal
-    source_type        TEXT,                    -- "pdf", "docx"
+    source_type        TEXT,                    -- "pdf", "docx", "html"
     extracted_at       TEXT,                    -- ISO datetime
     created_at         TEXT DEFAULT (datetime('now'))
 );
@@ -170,6 +170,7 @@ Sisten mengenali dan menghasilkan standar:
 | HEADER (slash) | `NOMOR 99/PMK.03/2024` | `PMK-99/2024` |
 | HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` |
 | FILENAME | `PMK-68-PMK-03-2024.pdf` | `PMK-68/2024` |
+| WEB HTML | `PER-8-PJ-2026-07-28.html` | `PER-8/PJ/2026` |
 
 ---
 

@@ -1,4 +1,4 @@
-# CorpusPrep -- corpus-preparation
+# CorpusPrep - corpus-preparation
 
 Peralatan persiapan corpus regulasi perpajakan Indonesia.
 
@@ -56,30 +56,35 @@ riset-pajak status
 ## Alur Pipeline
 
 ```
-1. add-pdf  -->  taruh file di data/raw/
-2. process  -->  extract --> clean --> split --> enrich --> export
-3. inspect  -->  lihat statistik corpus
+1. add-pdf / add-url -> taruh file di data/raw/
+2. process -> extract -> clean -> split -> enrich -> export
+3. inspect -> lihat statistik corpus
 ```
 
 ## Output
 
 Setelah `process`, tersedia:
 - `data/output/corpus.jsonl` -- satu dokumen per baris, siap untuk embedding/training
-- `data/output/corpus.md`    -- format markdown untuk human review
-- `data/processed/*.txt`     -- teks mentah hasil ekstraksi
-- `data/raw/*.html|*.pdf`    -- sumber asli hasil ingest dari web atau file lokal
+- `data/output/corpus.md` -- format markdown untuk human review
+- `data/processed/*.txt` -- teks mentah hasil ekstraksi
+- `data/raw/*.html|*.pdf|*.docx` -- sumber asli hasil ingest dari web atau file lokal
+
+Catatan naming untuk ingest web:
+- HTML dan lampiran disimpan dengan pola `nomor-YYYY-MM-DD`
+- nomor regulasi asli tetap dipertahankan di metadata, termasuk format seperti `34/MK/EF.2/2026`
 
 ## Arsitektur
 
 ```
 src/corpusprep/
-├── cli.py            # Perintah CLI (click)
-├── pipeline.py       # Orchestration pipeline
-├── extractors.py     # PDF/DOCX extraction
-├── splitter.py       # Pemecahan per pasal
-├── enrichment.py     # Klasifikasi & tag topik
-├── metadata.py       # Ekstraksi nomor, tahun, judul, identifier
-└── models.py         # Model data (pydantic)
+├── collectors/web.py   # Ingest halaman regulasi dan lampiran dari web
+├── cli.py              # Perintah CLI (click)
+├── pipeline.py         # Orchestration pipeline
+├── extractors.py       # PDF/DOCX extraction
+├── splitter.py         # Pemecahan per pasal
+├── enrichment.py       # Klasifikasi & tag topik
+├── metadata.py         # Ekstraksi nomor, tahun, judul, identifier
+└── models.py           # Model data (pydantic)
 ```
 
 ## Struktur Folder & File
@@ -103,15 +108,15 @@ corpus-preparation/
 │   ├── enrichment.py
 │   ├── metadata.py
 │   ├── models.py
-│   └── enrichers/, exporters/, processors/
+│   └── collectors/, enrichers/, exporters/, processors/
 │
 ├── data/
-│   ├── raw/          -- dokumen sumber (PDF/DOCX)
+│   ├── raw/          -- dokumen sumber (PDF/DOCX/HTML)
 │   ├── processed/    -- teks hasil ekstraksi
 │   └── output/       -- corpus.jsonl, corpus.md
 │
 ├── memory/
-│   └── 2026-04-07.md
+│   └── 2026-08-18.md
 │
 ├── tests/
 ├── scripts/
@@ -127,6 +132,7 @@ Sistem mengenali beberapa format standar dokumen regulasi Indonesia:
 | HEADER (slash) | `NOMOR 99/PMK.03/2024` | `PMK-99/2024` |
 | HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` |
 | FILENAME | `PMK-68-PMK-03-2024.pdf` | `PMK-68/2024` |
+| WEB HTML | `PER-8-PJ-2026-07-28.html` | `PER-8/PJ/2026` |
 
 Prioritas ekstraksi:
 1. **Scan header teks** -- format standar `NOMOR <angka>/<jenis>.<bidang>/<tahun>` atau `NOMOR <angka> TAHUN <tahun>`
@@ -163,12 +169,15 @@ pytest tests/ -v
 
 ## Next Steps
 
-- [ ] Scraper otomatis JDIH Kemenkeu
-- [ ] Scraper peraturan.go.id
-- [ ] Vector store integration (ChromaDB)
-- [ ] Semantic search
-- [ ] Integration dengan telegram-bot
+- [ ] Ingest 10-20 regulasi nyata via pipeline
+- [ ] Design & implement SQLite database schema
+- [ ] Implement regulation search handler di bot
+- [ ] Article retrieval handler (`/pasal`, `/cari`)
+- [ ] Summarization engine
+- [ ] Scraper otomatis JDIH Kemenkeu / peraturan.go.id
+- [ ] Semantic search (embedding model)
+- [ ] Vector store integration (ChromaDB/Faiss)
 
 ---
-**Status:** ✅ CLI Installed & Tested (29 unit tests passing)
-**Terakhir Diupdate:** 2026-04-07
+**Status:** CLI Installed & Tested (31 unit tests passing)
+**Terakhir Diupdate:** 2026-08-18

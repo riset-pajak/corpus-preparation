@@ -1,6 +1,6 @@
 # TASKS.md
 
-**Last Updated:** 2026-04-08
+**Last Updated:** 2026-08-18
 
 > Semua item di bawah ini adalah sub-tahapan dari **Phase 1 (Foundation)** di level proyek.
 > Pipeline stages: extract -> clean -> structure -> enrich -> output
@@ -8,6 +8,7 @@
 ## Pipeline Stage: Extraction ✅
 - [x] PDF loader (pdfplumber)
 - [x] DOCX loader (python-docx)
+- [x] HTML loader untuk ingest web
 - [x] Raw text storage (data/processed/)
 
 ## Pipeline Stage: Cleaning ✅
@@ -25,13 +26,14 @@
 - [x] Topic tagging (PPh, PPN, PPnBM, PBB, KUP, Bea Materai)
 - [x] Regulation type classification (UU, PMK, PP, PER, SE, KEP, INSTR)
 - [x] Metadata extraction (nomor, tahun, judul, identifier) - 3 strategi
+- [x] Web source ingest via `riset-pajak add-url`
 - [ ] Embedding -- Phase 3 project-level planned
 
 ## Pipeline Stage: Output ✅
 - [x] JSONL export (data/output/corpus.jsonl)
 - [x] Markdown export (data/output/corpus.md)
 - [x] Schema validation via Pydantic models
-- [x] 29 unit tests passing
+- [x] 31 unit tests passing
 
 ---
 
