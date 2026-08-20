@@ -207,11 +207,99 @@ jalankan `process` kembali agar database terisi dari sumber di `data/raw/`.
 pytest tests/ -v
 ```
 
+## Rencana Minggu Depan
+
+Urutan realistis yang disarankan sebelum masuk ke embedding atau vector store:
+
+### Langkah Jangka Pendek 1 — Audit data crawl
+
+- Audit hasil crawl DJP dan JDIH Kemenkeu.
+- Identifikasi halaman navigasi/non-regulasi yang ikut tersimpan.
+- Tandai dokumen gagal diproses sebagai `unparsed`.
+- Cek duplikasi berdasarkan `full_identifier`.
+
+### Langkah Jangka Pendek 2 — Inspeksi dan pencarian database
+
+- Implement `db-status` untuk menghitung `regulations`, `sections`, dan `topics`.
+- Implement pencarian sederhana berdasarkan judul, identifier, dan tahun.
+- Implement pengambilan detail regulasi dan pasal tertentu.
+
+Contoh target command:
+
+```bash
+riset-pajak db-status
+riset-pajak db-search "PPh Pasal 21"
+riset-pajak db-get "PMK-68/2024"
+```
+
+### Langkah Jangka Pendek 3 — SQLite FTS5
+
+Tambahkan full-text search untuk judul, full text, nomor pasal, dan isi pasal.
+FTS5 diprioritaskan sebelum embedding karena cepat, lokal, dan tidak membutuhkan
+model eksternal.
+
+### Langkah Jangka Pendek 4 — Test database dan crawler
+
+Tambahkan test untuk:
+
+- pembuatan schema SQLite;
+- upsert tanpa duplikasi regulasi;
+- penyimpanan sections dan topics;
+- import JSONL;
+- link internal dan batas crawl;
+- retry, 403, timeout, dan error per halaman;
+- collector DJP dengan HTML/PDF mock.
+
+Target: sekitar 40–45 test.
+
+### Langkah Jangka Pendek 5 — Optimasi process
+
+Tambahkan opsi:
+
+```bash
+riset-pajak process --only-new
+riset-pajak process --force
+riset-pajak process --db data.db
+```
+
+Tujuannya agar dokumen tidak selalu diproses ulang, tetapi tetap tersedia opsi
+reprocessing setelah parser diperbaiki.
+
+### Langkah Jangka Pendek 6 — Metadata sumber
+
+Tambahkan sumber resmi ke metadata/database, misalnya:
+
+```text
+source_name: djp_pemerintah | jdih_kemenkeu | ddtc |
+             peraturan_gov_id | mahkamah_konstitusi
+```
+
+Ini memungkinkan filter berdasarkan sumber pada inspeksi dan pencarian.
+
+### Langkah Jangka Pendek 7 — Review dan rilis
+
+- Jalankan crawl terbatas ulang.
+- Bandingkan jumlah dan kualitas data sebelum/sesudah.
+- Perbarui README, SCHEMA, dan TASKS.
+- Jalankan seluruh test suite.
+- Commit dan push perubahan.
+
+### Belum diprioritaskan
+
+Embedding, ChromaDB/Faiss, summarization, dan compliance reasoning dikerjakan
+setelah kualitas data dan pencarian SQLite stabil.
+
 ## Next Steps
 
 - [x] SQLite lokal untuk regulations, sections, dan topics
 - [x] Persistensi database dari command `process`
 - [x] Crawling katalog JDIH Kemenkeu, DJP, DDTC, MK, dan peraturan.go.id
+- [ ] Audit kualitas dan deduplikasi hasil crawl
+- [ ] Implement `db-status`, `db-search`, dan `db-get`
+- [ ] Implement SQLite FTS5
+- [ ] Tambahkan test database dan crawler
+- [ ] Tambahkan mode `process --only-new` dan `--force`
+- [ ] Tambahkan metadata `source_name`
 - [ ] Implement regulation search handler di bot
 - [ ] Article retrieval handler (`/pasal`, `/cari`)
 - [ ] Summarization engine
