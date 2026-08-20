@@ -1,6 +1,6 @@
 # TASKS.md
 
-**Last Updated:** 2026-08-18
+**Last Updated:** 2026-08-20
 
 > Semua item di bawah ini adalah sub-tahapan dari **Phase 1 (Foundation)** di level proyek.
 > Pipeline stages: extract -> clean -> structure -> enrich -> output
@@ -27,27 +27,31 @@
 - [x] Regulation type classification (UU, PMK, PP, PER, SE, KEP, INSTR)
 - [x] Metadata extraction (nomor, tahun, judul, identifier) - 3 strategi
 - [x] Web source ingest via `riset-pajak add-url`
+- [x] Source-specific collectors: JDIH Kemenkeu, peraturan.go.id, MK, DDTC, DJP
+- [x] Automatic crawling via `riset-pajak crawl`
 - [ ] Embedding -- Phase 3 project-level planned
 
 ## Pipeline Stage: Output ✅
 - [x] JSONL export (data/output/corpus.jsonl)
 - [x] Markdown export (data/output/corpus.md)
 - [x] Schema validation via Pydantic models
+- [x] SQLite persistence melalui `data.db`
 - [x] 31 unit tests passing
 
 ---
 
-## Phase 2 (Project-level: Intelligence) -- NEXT
+## Phase 2 (Project-level: Intelligence) -- IN PROGRESS
 
-- [ ] Ingest 10-20 regulasi nyata via pipeline
-- [ ] Design & implement SQLite database schema (SCHEMA.md)
+- [x] Ingest regulasi nyata melalui crawling dan pipeline
+- [x] Design & implement SQLite database schema (SCHEMA.md)
 - [ ] Implement regulation search handler di bot
 - [ ] Article retrieval handler (/pasal, /cari)
 - [ ] Summarization engine
 
 ## Phase 3 (Project-level: Advanced Research) -- PLANNED
 
-- [ ] Scraper otomatis JDIH Kemenkeu / peraturan.go.id
+- [x] Scraper otomatis JDIH Kemenkeu, peraturan.go.id, MK, DDTC, dan DJP
+- [x] Automatic crawl command dengan batas halaman/kedalaman
 - [ ] Semantic search (embedding model)
 - [ ] Vector store integration (ChromaDB/Faiss)
 - [ ] Regulation comparison

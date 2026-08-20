@@ -20,7 +20,7 @@ Setelah instalasi, perintah `riset-pajak` tersedia di CLI dari mana saja.
 riset-pajak init
 ```
 
-Membuat struktur folder `data/raw/`, `data/processed/`, `data/output/`, dan `configs/`.
+Membuat struktur folder `data/raw/`, `data/processed/`, `data/output/`, dan `configs/`. Database SQLite lokal berada di `data.db` pada root proyek dan dibuat/diinisialisasi saat `process` dijalankan.
 
 ### Tambah Dokumen
 
@@ -36,9 +36,28 @@ riset-pajak add-url https://pajak.go.id/id/peraturan/...
 ### Proses Corpus
 
 ```bash
-# Ekstrak, bersihkan, split per pasal, enrich metadata, export JSONL
+# Ekstrak, bersihkan, split per pasal, enrich metadata,
+# export JSONL/Markdown, dan upsert ke SQLite data.db
 riset-pajak process
 ```
+
+### Crawling Otomatis
+
+Crawl katalog regulasi tanpa memasukkan URL dokumen satu per satu. Crawler hanya
+mengikuti link internal, memiliki batas halaman/kedalaman, dan memberi jeda antar-request.
+
+```bash
+# Gunakan crawl_url dari configs/sources.yaml
+riset-pajak crawl --source djp_pemerintah
+riset-pajak crawl --source jdih_kemenkeu --max-pages 100 --max-depth 2 --delay 1.0
+
+# Override seed URL bila situs memiliki katalog khusus
+riset-pajak crawl --source djp_pemerintah \
+  --seed https://pajak.go.id/id/peraturan
+```
+
+Sumber yang tersedia: `djp_pemerintah`, `jdih_kemenkeu`, `peraturan_gov_id`,
+`mahkamah_konstitusi`, dan `ddtc`.
 
 ### Inspeksi
 
@@ -56,9 +75,9 @@ riset-pajak status
 ## Alur Pipeline
 
 ```
-1. add-pdf / add-url -> taruh file di data/raw/
-2. process -> extract -> clean -> split -> enrich -> export
-3. inspect -> lihat statistik corpus
+1. add-pdf / add-url / crawl -> simpan sumber asli di data/raw/
+2. process -> extract -> clean -> split -> enrich -> export JSONL/Markdown + SQLite
+3. inspect / status -> lihat statistik dan status pipeline
 ```
 
 ## Output
@@ -68,6 +87,11 @@ Setelah `process`, tersedia:
 - `data/output/corpus.md` -- format markdown untuk human review
 - `data/processed/*.txt` -- teks mentah hasil ekstraksi
 - `data/raw/*.html|*.pdf|*.docx` -- sumber asli hasil ingest dari web atau file lokal
+- `data.db` -- database SQLite lokal untuk regulations, sections, dan topics
+
+`data.db` di root proyek adalah database contoh yang dapat di-commit. Data hasil crawl
+atau process berikutnya akan memperbarui database lokal tersebut; artefak mentah tetap
+tersimpan di `data/raw/` untuk traceability.
 
 Catatan naming untuk ingest web:
 - HTML dan lampiran disimpan dengan pola `nomor-YYYY-MM-DD`
@@ -78,6 +102,8 @@ Catatan naming untuk ingest web:
 ```
 src/corpusprep/
 ├── collectors/web.py   # Ingest halaman regulasi dan lampiran dari web
+├── collectors/crawler.py # Crawling katalog regulasi berbasis sumber
+├── database.py          # Persistensi SQLite lokal
 ├── cli.py              # Perintah CLI (click)
 ├── pipeline.py         # Orchestration pipeline
 ├── extractors.py       # PDF/DOCX extraction
@@ -110,6 +136,7 @@ corpus-preparation/
 │   ├── models.py
 │   └── collectors/, enrichers/, exporters/, processors/
 │
+├── data.db           -- database SQLite contoh/lokal
 ├── data/
 │   ├── raw/          -- dokumen sumber (PDF/DOCX/HTML)
 │   ├── processed/    -- teks hasil ekstraksi
@@ -161,6 +188,19 @@ Setiap baris di `corpus.jsonl` berisi satu dokumen dengan struktur:
 }
 ```
 
+## Database SQLite
+
+`process` otomatis melakukan upsert ke `data.db` berdasarkan `full_identifier`.
+Database memiliki tabel:
+
+- `regulations` -- metadata dan full text regulasi
+- `sections` -- pasal/ayat dengan urutan
+- `topics` -- relasi topik pajak
+
+Database contoh yang di-commit saat ini berisi 110 regulasi, 1.360 sections,
+dan 161 topic associations. Jika JSONL sudah tersedia tetapi database kosong,
+jalankan `process` kembali agar database terisi dari sumber di `data/raw/`.
+
 ## Testing
 
 ```bash
@@ -169,15 +209,15 @@ pytest tests/ -v
 
 ## Next Steps
 
-- [ ] Ingest 10-20 regulasi nyata via pipeline
-- [ ] Design & implement SQLite database schema
+- [x] SQLite lokal untuk regulations, sections, dan topics
+- [x] Persistensi database dari command `process`
+- [x] Crawling katalog JDIH Kemenkeu, DJP, DDTC, MK, dan peraturan.go.id
 - [ ] Implement regulation search handler di bot
 - [ ] Article retrieval handler (`/pasal`, `/cari`)
 - [ ] Summarization engine
-- [ ] Scraper otomatis JDIH Kemenkeu / peraturan.go.id
 - [ ] Semantic search (embedding model)
 - [ ] Vector store integration (ChromaDB/Faiss)
 
 ---
-**Status:** CLI Installed & Tested (31 unit tests passing)
-**Terakhir Diupdate:** 2026-08-18
+**Status:** CLI, crawling, dan SQLite lokal implemented; 31 unit tests passing
+**Terakhir Diupdate:** 2026-08-20

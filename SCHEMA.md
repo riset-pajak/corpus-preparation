@@ -1,7 +1,7 @@
 # SCHEMA.md -- Corpus & Database Schema
 
-**Last Updated:** 2026-08-18
-**Status:** Phase 1 implemented (JSONL + HTML ingest), Phase 2 planned (SQLite)
+**Last Updated:** 2026-08-20
+**Status:** SQLite lokal implemented; JSONL/Markdown tetap tersedia sebagai export audit dan review
 
 ---
 
@@ -74,7 +74,7 @@ Output `data/output/corpus.jsonl` -- satu dokumen per baris, serialized dari `Re
 
 ---
 
-## 3. SQLite Database Schema (Phase 2 -- Planned)
+## 3. SQLite Database Schema (Implemented)
 
 Untuk integrasi dengan telegram-bot (search, retrieval, cross-reference).
 
@@ -174,16 +174,19 @@ Sisten mengenali dan menghasilkan standar:
 
 ---
 
-## 5. Migration Plan (JSONL → SQLite)
+## 5. Persistence Flow (Implemented)
 
 ```
-Step 1: Baca semua baris di corpus.jsonl
-Step 2: Deserialize ke RegulationDoc (pydantic)
-Step 3: Insert ke tabel regulations
-Step 4: Insert sections dengan order dan FK
-Step 5: Insert topics ke tabel topics
-Step 6: Build FTS5 indexes
-Step 7: Verify row counts match
+Step 1: `riset-pajak process` membaca sumber dari `data/raw/`
+Step 2: Ekstrak, clean, split, dan enrich menjadi `RegulationDoc`
+Step 3: Export audit ke `data/output/corpus.jsonl` dan `corpus.md`
+Step 4: Upsert ke `data.db` berdasarkan `full_identifier`
+Step 5: Replace sections/topics untuk dokumen yang sama
+Step 6: Verify row counts dengan query SQLite
+
+Untuk migrasi JSONL lama secara manual, gunakan `import_jsonl` dari
+`src/corpusprep/database.py`. Database contoh yang di-commit berisi 110 regulasi,
+1.360 sections, dan 161 topics.
 ```
 
 ---
