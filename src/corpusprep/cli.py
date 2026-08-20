@@ -60,6 +60,15 @@ def _save_corpus(output_dir: Path, docs: list[dict]) -> None:
     console.print(f"[green bold]Corpus disimpan[/] ke [cyan]{jsonl_path}[/] ({len(docs)} dokumen)")
 
 
+def _save_database(root: Path, docs: list[dict]) -> None:
+    """Simpan dokumen hasil process ke SQLite lokal."""
+    from corpusprep.database import save_documents
+
+    db_path = root / "data.db"
+    count = save_documents(db_path, docs)
+    console.print(f"[green bold]Database diperbarui[/] ke [cyan]{db_path}[/] ({count} dokumen)")
+
+
 # -------------------------------------------------------------------------
 # CLI
 # -------------------------------------------------------------------------
@@ -198,6 +207,7 @@ def add_url(urls: tuple[str, ...], data_dir: str) -> None:
 @click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
 @click.option("--format", "fmt", default="all", type=click.Choice(["all", "markdown", "jsonl"]),
               help="Output format (default: all)")
+
 def process(data_dir: str, fmt: str) -> None:
     """Proses dokumen di data/raw/ -- ekstrak, bersihkan, split, enrich."""
     root = Path(data_dir).resolve()
@@ -230,6 +240,7 @@ def process(data_dir: str, fmt: str) -> None:
         _save_corpus(output_dir, docs_processed)
     if fmt in ("all", "markdown"):
         _save_markdown(output_dir, docs_processed)
+    _save_database(root, docs_processed)
 
     console.print(f"\n[green bold]Selesai![/] {len(docs_processed)} dokumen diproses.")
 
@@ -348,6 +359,101 @@ def status(data_dir: str) -> None:
         console.print(f"  data/output/    : [dim]belum ada corpus[/]")
 
     console.print()
+
+
+@main.command("add-pajak-gov-id")
+@click.argument("urls", nargs=-1, required=True)
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def add_pajak_gov_id(urls: tuple[str, ...], data_dir: str) -> None:
+    """Unduh regulasi dari situs resmi DJP, pajak.go.id."""
+    root = Path(data_dir).resolve()
+    _ensure_dirs(root)
+    raw_dir = _get_data_dirs(root)["raw"]
+
+    from corpusprep.collectors.pajak_gov_id import save_web_regulation
+
+    saved: list[str] = []
+    failed: list[str] = []
+    for url in urls:
+        try:
+            artifacts = save_web_regulation(url, raw_dir)
+            saved.extend(f"{item.kind}: {item.path.name}" for item in artifacts)
+            console.print(f"\n[green bold]OK[/] {url}")
+            for item in artifacts:
+                console.print(f"  [green]+[/] {item.kind}: {item.path.name}")
+        except Exception as exc:
+            failed.append(f"{url} -- {exc}")
+            console.print(f"\n[red bold]FAIL[/] {url} -- {exc}")
+
+    if saved:
+        console.print(f"\n[green bold]{len(saved)} artefak disimpan[/] ke [cyan]data/raw/[/]")
+    if failed:
+        console.print(f"\n[yellow]{len(failed)} URL gagal[/]")
+        for msg in failed:
+            console.print(f"  [yellow]-[/] {msg}")
+
+
+@main.command("crawl")
+@click.option(
+    "--source",
+    "source_name",
+    required=True,
+    type=click.Choice(
+        ["jdih_kemenkeu", "peraturan_gov_id", "mahkamah_konstitusi", "ddtc", "djp_pemerintah"]
+    ),
+    help="Sumber yang akan di-crawl.",
+)
+@click.option("--seed", help="URL katalog/indeks sumber; default dari configs/sources.yaml.")
+@click.option("--max-pages", default=100, show_default=True, type=click.IntRange(min=1))
+@click.option("--max-depth", default=2, show_default=True, type=click.IntRange(min=0))
+@click.option("--delay", default=0.25, show_default=True, type=float)
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def crawl(
+    source_name: str,
+    seed: str | None,
+    max_pages: int,
+    max_depth: int,
+    delay: float,
+    data_dir: str,
+) -> None:
+    """Crawl indeks regulasi, tanpa memasukkan URL dokumen satu per satu."""
+    root = Path(data_dir).resolve()
+    _ensure_dirs(root)
+    config = _load_config(root / "configs" / "sources.yaml")
+    source_config = config.get("sources", {}).get(source_name, {})
+    seed_url = seed or source_config.get("crawl_url") or source_config.get("base_url")
+    if not seed_url:
+        raise click.ClickException(
+            f"Sumber {source_name!r} belum memiliki crawl_url/base_url di configs/sources.yaml"
+        )
+
+    collectors = {
+        "jdih_kemenkeu": "corpusprep.collectors.jdih_kemenkeu",
+        "peraturan_gov_id": "corpusprep.collectors.peraturan_gov_id",
+        "mahkamah_konstitusi": "corpusprep.collectors.mahkamah_konstitusi",
+        "ddtc": "corpusprep.collectors.ddtc",
+        "djp_pemerintah": "corpusprep.collectors.pajak_gov_id",
+    }
+    module = __import__(collectors[source_name], fromlist=["save_web_regulation"])
+    save_page = module.save_web_regulation
+
+    from corpusprep.collectors.crawler import crawl_source
+
+    console.print(f"\n[bold]Crawling {source_name} dari {seed_url}...[/]")
+    result = crawl_source(
+        seed_url,
+        _get_data_dirs(root)["raw"],
+        save_page,
+        max_pages=max_pages,
+        max_depth=max_depth,
+        delay=delay,
+    )
+    console.print(
+        f"[green]Selesai[/]: {result.visited} halaman dikunjungi, "
+        f"{result.saved} artefak disimpan, {len(result.failed)} gagal."
+    )
+    for message in result.failed:
+        console.print(f"  [yellow]-[/] {message}")
 
 
 if __name__ == "__main__":
