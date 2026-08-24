@@ -84,6 +84,25 @@ Embedding, ChromaDB/Faiss, summarization, dan compliance reasoning ditunda sampa
 
 Target setelah minggu depan: sekitar 40–45 test dengan database dan crawler tervalidasi.
 
+## Todo Hari Ini (2026-08-24) -- Langkah 1: Audit data crawl
+
+Baseline terverifikasi: 246 file di `data/raw/` (192 HTML, 54 PDF);
+`data.db`: 110 regulasi / 1.360 sections / 161 topics.
+
+- [ ] Bersihkan 7 halaman navigasi JDIH yang ikut tersimpan (`atom.xml`, `bantuan`,
+      `berita`, `direktori`) lalu tambah skip-pattern di crawler agar tidak terulang
+- [ ] Review 40 regulasi dengan `reg_type=OTHER`; prioritas:
+  - [ ] 1 row `full_identifier = UNKNOWN` (hanya punya 1 section)
+  - [ ] 3 row identifier berupa judul panjang (termasuk KMK `488/KMK.010/2021`)
+  - [ ] 13 row tanpa tahun
+- [ ] Verifikasi 6 grup duplikat number+tahun; pastikan identifier menyertakan jenis
+      regulasi agar unik -- kasus aktual: `20/2026`, `PP-20/2026`, `UU-20/2026`
+      bersama-sama masuk DB sebagai identifier berbeda tapi saling menyesatkan
+- [ ] Tandai dokumen gagal parsing dengan `status = 'unparsed'`
+- [ ] Catat temuan audit di `memory/2026-08-24.md`
+
+Sisa waktu: mulai Langkah 2 (`db-status`) menggunakan fungsi `counts()` yang sudah ada.
+
 ## Catatan Status Dokumentasi (2026-08-24)
 
 - SQLite schema aktif hanya `regulations`, `sections`, `topics` + index; FTS5 belum diimplementasikan (Langkah 3).
