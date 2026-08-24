@@ -1,6 +1,6 @@
 # TASKS.md
 
-**Last Updated:** 2026-08-20
+**Last Updated:** 2026-08-24
 
 > Semua item di bawah ini adalah sub-tahapan dari **Phase 1 (Foundation)** di level proyek.
 > Pipeline stages: extract -> clean -> structure -> enrich -> output
@@ -27,7 +27,7 @@
 - [x] Regulation type classification (UU, PMK, PP, PER, SE, KEP, INSTR)
 - [x] Metadata extraction (nomor, tahun, judul, identifier) - 3 strategi
 - [x] Web source ingest via `riset-pajak add-url`
-- [x] Source-specific collectors: JDIH Kemenkeu, peraturan.go.id, MK, DDTC, DJP
+- [x] Source-specific collectors: JDIH Kemenkeu, peraturan.go.id, MK, DDTC, DJP (`add-pajak-gov-id` untuk pajak.go.id)
 - [x] Automatic crawling via `riset-pajak crawl`
 - [ ] Embedding -- Phase 3 project-level planned
 
@@ -36,7 +36,7 @@
 - [x] Markdown export (data/output/corpus.md)
 - [x] Schema validation via Pydantic models
 - [x] SQLite persistence melalui `data.db`
-- [x] 31 unit tests passing
+- [x] 32 unit tests (31 passed + 1 skipped: reportlab tidak terpasang untuk PDF dummy)
 
 ---
 
@@ -83,3 +83,9 @@ Embedding, ChromaDB/Faiss, summarization, dan compliance reasoning ditunda sampa
 ## Validation Target
 
 Target setelah minggu depan: sekitar 40–45 test dengan database dan crawler tervalidasi.
+
+## Catatan Status Dokumentasi (2026-08-24)
+
+- SQLite schema aktif hanya `regulations`, `sections`, `topics` + index; FTS5 belum diimplementasikan (Langkah 3).
+- `configs/sources.yaml` tidak di-commit (gitignore); jalankan `riset-pajak init` atau buat manual sebelum crawl.
+- Parser identifier belum menangani nomor dengan bidang non-numerik (`488/KMK.010/2026`, `34/MK/EF.2/2026`) -- masuk Langkah 1.

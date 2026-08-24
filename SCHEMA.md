@@ -74,7 +74,7 @@ Output `data/output/corpus.jsonl` -- satu dokumen per baris, serialized dari `Re
 
 ---
 
-## 3. SQLite Database Schema (Implemented)
+## 3. SQLite Database Schema (Implemented -- tanpa FTS5)
 
 Untuk integrasi dengan telegram-bot (search, retrieval, cross-reference).
 
@@ -135,8 +135,18 @@ CREATE INDEX idx_reg_type ON regulations(reg_type);
 -- Pencarian berdasarkan tahun
 CREATE INDEX idx_reg_year ON regulations(year);
 
--- Text search pada title
--- SQLite FTS5 akan dipakai untuk full-text search
+-- Index tambahan yang juga aktif:
+CREATE INDEX idx_sections_regulation ON sections(regulation_id);
+```
+
+**Catatan FTS5:** tabel virtual `regulations_fts` dan `sections_fts` dulunya
+didokumentasikan sebagai bagian dari schema, tetapi **belum diimplementasikan**
+di `src/corpusprep/database.py` maupun di `data.db` (tabel aktif hanya
+`regulations`, `sections`, dan `topics`). Implementasinya adalah Langkah 3
+pada rencana jangka pendek; desain tabel virtual yang akan dipakai:
+
+```sql
+-- Text search pada title dan full text regulasi
 CREATE VIRTUAL TABLE IF NOT EXISTS regulations_fts USING fts5(
     title, full_text,
     content=regulations,
@@ -168,9 +178,15 @@ Sisten mengenali dan menghasilkan standar:
 | Sumber | Format Input | Output full_identifier |
 |--------|-------------|----------------------|
 | HEADER (slash) | `NOMOR 99/PMK.03/2024` | `PMK-99/2024` |
-| HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` |
+| HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` (jenis ditebak dari header) |
 | FILENAME | `PMK-68-PMK-03-2024.pdf` | `PMK-68/2024` |
-| WEB HTML | `PER-8-PJ-2026-07-28.html` | `PER-8/PJ/2026` |
+| WEB HTML | halaman JDIH dengan field nomor dokumen | kanonis, mis. `PMK-228/2017` (dari field HTML) |
+
+Keterbatasan yang diketahui (masuk Langkah 1 audit):
+- Filename web seperti `228-PMK.03-2026-02-11.html` belum menghasilkan
+  identifier bila field HTML tidak tersedia.
+- Nomor dengan bidang non-numerik (`488/KMK.010/2026`, `34/MK/EF.2/2026`)
+  belum tertangani parser filename/header.
 
 ---
 

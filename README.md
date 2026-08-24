@@ -6,13 +6,24 @@ Peralatan persiapan corpus regulasi perpajakan Indonesia.
 
 ```bash
 cd corpus-preparation
-source venv/bin/activate
+source venv/bin/activate       # Windows Git Bash: source venv/Scripts/activate
 pip install -e .
 ```
 
 ## Penggunaan
 
 Setelah instalasi, perintah `riset-pajak` tersedia di CLI dari mana saja.
+
+| Command | Deskripsi |
+|---------|-----------|
+| `riset-pajak init` | Inisialisasi struktur folder data |
+| `riset-pajak add-pdf <file...>` | Tambahkan PDF/DOCX/HTML/TXT ke data/raw/ |
+| `riset-pajak add-url <url...>` | Unduh halaman regulasi + lampiran PDF |
+| `riset-pajak add-pajak-gov-id <url...>` | Unduh regulasi dari pajak.go.id |
+| `riset-pajak crawl --source <nama>` | Crawl katalog regulasi berbasis sumber |
+| `riset-pajak process [--format all\|markdown\|jsonl]` | Jalankan pipeline lengkap |
+| `riset-pajak inspect [--raw]` | Statistik corpus / daftar file raw |
+| `riset-pajak status` | Status ringkas pipeline |
 
 ### Inisialisasi
 
@@ -56,8 +67,10 @@ riset-pajak crawl --source djp_pemerintah \
   --seed https://pajak.go.id/id/peraturan
 ```
 
-Sumber yang tersedia: `djp_pemerintah`, `jdih_kemenkeu`, `peraturan_gov_id`,
-`mahkamah_konstitusi`, dan `ddtc`.
+Sumber yang tersedia: `djp_pemerintah` (pajak.go.id), `jdih_kemenkeu`,
+`peraturan_gov_id`, `mahkamah_konstitusi`, dan `ddtc`. Seed URL diambil dari
+`configs/sources.yaml` (file ini tidak di-commit; jalankan `init` untuk membuat
+contoh config atau salin manual).
 
 ### Inspeksi
 
@@ -96,6 +109,8 @@ tersimpan di `data/raw/` untuk traceability.
 Catatan naming untuk ingest web:
 - HTML dan lampiran disimpan dengan pola `nomor-YYYY-MM-DD`
 - nomor regulasi asli tetap dipertahankan di metadata, termasuk format seperti `34/MK/EF.2/2026`
+- Jika nomor/tanggal tidak ditemukan di halaman, fallback memakai slug URL dan
+  tanggal menjadi `unknown-date`
 
 ## Arsitektur
 
@@ -134,7 +149,7 @@ corpus-preparation/
 │   ├── enrichment.py
 │   ├── metadata.py
 │   ├── models.py
-│   └── collectors/, enrichers/, exporters/, processors/
+│   └── collectors/         # web.py, crawler.py, + collector per sumber
 │
 ├── data.db           -- database SQLite contoh/lokal
 ├── data/
@@ -143,7 +158,7 @@ corpus-preparation/
 │   └── output/       -- corpus.jsonl, corpus.md
 │
 ├── memory/
-│   └── 2026-08-18.md
+│   └── YYYY-MM-DD.md       # log harian
 │
 ├── tests/
 ├── scripts/
@@ -159,10 +174,15 @@ Sistem mengenali beberapa format standar dokumen regulasi Indonesia:
 | HEADER (slash) | `NOMOR 99/PMK.03/2024` | `PMK-99/2024` |
 | HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` |
 | FILENAME | `PMK-68-PMK-03-2024.pdf` | `PMK-68/2024` |
-| WEB HTML | `PER-8-PJ-2026-07-28.html` | `PER-8/PJ/2026` |
+| WEB HTML | `228-PMK.03-2026-02-11.html` | `PMK-228/2017` (via header HTML) |
+
+Catatan: untuk ingest web, nomor kanonis (`PMK-228/2017`) diekstrak dari field
+HTML `field--name-field-nomor-dokumen` oleh collector, bukan dari nama file.
+Format dengan bidang non-numerik seperti `488/KMK.010/2026` atau `34/MK/EF.2/2026`
+belum sepenuhnya tertangani oleh parser filename/header (masuk Langkah 1 audit).
 
 Prioritas ekstraksi:
-1. **Scan header teks** -- format standar `NOMOR <angka>/<jenis>.<bidang>/<tahun>` atau `NOMOR <angka> TAHUN <tahun>`
+1. **Scan header teks** -- format standar `NOMOR <angka>/<jenis>.<bidang>/<tahun>` atau `NOMOR <angka> TAHUN <tahun>`; jenis UU/PP/PER juga ditebak dari kata kunci header
 2. **Parse nama file** -- pola `<JENIS>-<NOMOR>-<TAHUN>` atau variasi
 3. **Fallback** -- regex longgar + bagian-bagian filename
 
@@ -198,8 +218,8 @@ Database memiliki tabel:
 - `topics` -- relasi topik pajak
 
 Database contoh yang di-commit saat ini berisi 110 regulasi, 1.360 sections,
-dan 161 topic associations. Jika JSONL sudah tersedia tetapi database kosong,
-jalankan `process` kembali agar database terisi dari sumber di `data/raw/`.
+dan 161 topic associations (per 2026-08-20). Full-text search (FTS5) belum
+diimplementasikan -- lihat rencana di bawah.
 
 ## Testing
 
@@ -307,5 +327,5 @@ setelah kualitas data dan pencarian SQLite stabil.
 - [ ] Vector store integration (ChromaDB/Faiss)
 
 ---
-**Status:** CLI, crawling, dan SQLite lokal implemented; 31 unit tests passing
-**Terakhir Diupdate:** 2026-08-20
+**Status:** CLI, crawling, dan SQLite lokal implemented; 32 tests (31 passed + 1 skipped)
+**Terakhir Diupdate:** 2026-08-24
