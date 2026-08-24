@@ -24,6 +24,9 @@ Setelah instalasi, perintah `riset-pajak` tersedia di CLI dari mana saja.
 | `riset-pajak process [--format all\|markdown\|jsonl]` | Jalankan pipeline lengkap |
 | `riset-pajak inspect [--raw]` | Statistik corpus / daftar file raw |
 | `riset-pajak status` | Status ringkas pipeline |
+| `riset-pajak db-status` | Statistik database SQLite (total, jenis, status, topik) |
+| `riset-pajak db-search "query" [--year N]` | Pencarian LIKE di judul/identifier |
+| `riset-pajak db-get <ID> [--text]` | Detail regulasi + pasal-pasal |
 
 ### Inisialisasi
 

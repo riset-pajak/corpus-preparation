@@ -45,7 +45,11 @@
 - [x] Ingest regulasi nyata melalui crawling dan pipeline
 - [x] Design & implement SQLite database schema (SCHEMA.md)
 - [x] Audit kualitas dan deduplikasi hasil crawl
-- [ ] Implement `db-status`, `db-search`, dan `db-get`
+- Implement `db-status`, `db-search`, dan `db-get` untuk metadata, judul, tahun, dan pasal.
+- ✅ Sudah diimplementasi (2026-08-24):
+  - `riset-pajak db-status` -> statistik lengkap DB (total, per jenis, per status, rentang tahun, topik)
+  - `riset-pajak db-search "query" [--year N]` -> pencarian LIKE di title/identifier (+ filter tahun)
+  - `riset-pajak db-get <ID> [--text]` -> detail regulasi + daftar pasal (+ full text)
 - [ ] Implement SQLite FTS5
 - [ ] Tambahkan test database dan crawler
 - [ ] Tambahkan mode `process --only-new` dan `--force`
