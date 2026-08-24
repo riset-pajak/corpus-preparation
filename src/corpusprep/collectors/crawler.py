@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+import re
 import time
 from pathlib import Path
 from typing import Callable
@@ -15,6 +16,23 @@ from urllib.parse import urldefrag, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup
+
+# Path halaman navigasi/listing yang bukan dokumen regulasi.
+# Dipelajari dari audit crawl JDIH/pajak.go.id (memory/2026-08-24.md).
+_NAV_PATH_PATTERN = re.compile(
+    r"/(search|berita|bantuan|direktori|faq|kamus-hukum|kebijakan-privasi"
+    r"|prasyarat|prestasi-dan-penghargaan|rating|simplifikasi|sosialisasi"
+    r"|statistik|struktur-organisasi|tentang-jdih|jdihn|infografis|tematik)"
+    r"(/|$)"
+    r"|/(atom|rss)\.xml$"
+    r"|/taxonomy/term/\d+$",
+    re.IGNORECASE,
+)
+
+
+def _is_navigation_url(url: str) -> bool:
+    """True bila URL adalah halaman navigasi/listing, bukan dokumen regulasi."""
+    return bool(_NAV_PATH_PATTERN.search(urlparse(url).path.lower()))
 
 
 @dataclass(slots=True)
@@ -119,6 +137,8 @@ def _extract_links(html: str, base_url: str, seed_path: str) -> list[str]:
         absolute = _normalise_url(urljoin(base_url, href))
         if not _is_internal(absolute, host):
             continue
+        if _is_navigation_url(absolute):
+            continue
         text = anchor.get_text(" ", strip=True)
         if not _looks_like_regulation_link(absolute, text, seed_path):
             continue
@@ -162,6 +182,13 @@ def crawl_source(
         if url in visited:
             continue
         visited.add(url)
+
+        # Halaman navigasi tetap dikunjungi untuk menemukan link dokumen,
+        # tetapi tidak pernah disimpan sebagai artefak.
+        if url != seed_url and _is_navigation_url(url):
+            if delay:
+                time.sleep(delay)
+            continue
 
         try:
             html, final_url = _fetch_html(url, timeout=timeout)

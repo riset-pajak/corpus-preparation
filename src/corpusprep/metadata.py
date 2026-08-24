@@ -16,9 +16,10 @@ def extract_identifier(text: str, source_file: Optional[str] = None) -> dict:
     Ekstrak nomor, tahun, dan judul dari sebuah dokumen regulasi.
 
     Priority:
-      1. Scan teks header untuk format standar: NOMOR 99/PMK.03/2024
+      1. Scan teks preamble (header SEBELUM kata "Menimbang"; nomor regulasi
+         yang dirujuk dalam menimbang tidak boleh menjadi identitas dokumen)
       2. Jika tidak ditemukan, coba parse dari nama file
-      3. Fallback: regex longgar + filename parts
+      3. Fallback: pola "<JENIS> NOMOR <n> TAHUN <tahun>" + regex longgar
 
     Returns dict dengan key:
       number (str), year (int | None), full_identifier (str), title (str)
@@ -26,7 +27,18 @@ def extract_identifier(text: str, source_file: Optional[str] = None) -> dict:
     header = text[:2000] if len(text) > 2000 else text
     filename = Path(source_file).name if source_file else ""
 
-    result = _from_standard_header(header) or {}
+    # Identitas dokumen selalu tertulis sebelum bagian Menimbang.
+    preamble = re.split(r"\bMENIMBANG\b", header, maxsplit=1, flags=re.IGNORECASE)[0]
+
+    result = _from_standard_header(preamble) or {}
+
+    # Pola "<JENIS> NOMOR <n> TAHUN <tahun>" (mis. PMK dicetak tanpa slash)
+    if not result.get("number"):
+        result.update(_preamble_number_year(preamble))
+        if result and not result.get("reg_type_short"):
+            guessed = _guess_reg_type(preamble[:300])
+            if guessed:
+                result["reg_type_short"] = guessed
 
     # Enrich dari filename jika ada yang kurang
     if not result:
@@ -34,14 +46,31 @@ def extract_identifier(text: str, source_file: Optional[str] = None) -> dict:
     else:
         result = _enrich_from_filename(result, filename)
 
-    # Fallback akhir: regex longgar di header
+    # Upaya terakhir pada preamble: "<n>/<JENIS>.<bidang>/<tahun>" tanpa kata
+    # NOMOR -- umum pada halaman detail web DJP/JDIH (mis. "969/KMK.04/1983").
+    # Dijalankan hanya bila JENIS regulasi belum diketahui: kalau filename
+    # sudah memberi pasangan jenis+nomor yang kuat (mis. PMK-51-2026-abstrak),
+    # itu lebih kanonis daripada nomor lain yang mungkin muncul di teks.
+    if not result.get("reg_type_short"):
+        m = re.search(
+            r"\b(\d{1,4})\s*/\s*(UU|PMK|PP|PER|SE|KEP|INSTR|KMK)"
+            r"(?:\.\d+)*\s*/\s*(\d{4})",
+            preamble,
+            re.IGNORECASE,
+        )
+        if m:
+            result["number"] = m.group(1)
+            result["reg_type_short"] = m.group(2).upper()
+            result["year"] = int(m.group(3))
+
+    # Fallback akhir: regex longgar di preamble
     if not result.get("number"):
-        m = re.search(r'(?:UU|PMK|PP|PER|SE|KEP|INSTR)[-\.\s]*(\d+)', header, re.IGNORECASE)
+        m = re.search(r"(?:UU|PMK|PP|PER|SE|KEP|INSTR)[-.\s]*(\d+)", preamble, re.IGNORECASE)
         if m:
             result.setdefault("number", m.group(1))
 
     if not result.get("year"):
-        m = re.search(r'\b(19[5-9]\d|20[0-2]\d|2030)\b', header)
+        m = re.search(r'\b(19[5-9]\d|20[0-2]\d|2030)\b', preamble)
         if m:
             result.setdefault("year", int(m.group(1)))
 
@@ -121,6 +150,28 @@ def _from_standard_header(header: str) -> Optional[dict]:
     return None
 
 
+def _preamble_number_year(preamble: str) -> dict:
+    """Pola '<JENIS> NOMOR <n> TAHUN <tahun>' pada preamble tanpa 'NOMOR ... TAHUN ...' murni.
+
+    Contoh nyata (PDF cetakan DJP):
+        PERATURAN MENTERI KEUANGAN REPUBLIK INDONESIA
+        NOMOR 61 TAHUN 2026
+    diikuti bagian Menimbang -- identitas ada sebelum Menimbang.
+    """
+    m = re.search(
+        r"(UU|PMK|PP|PER|SE|KEP|INSTR)\s+[-.]?\s*NOMOR\s+(\d+)\s+TAHUN\s+(\d{4})",
+        preamble,
+        re.IGNORECASE,
+    )
+    if m:
+        return {
+            "reg_type_short": m.group(1).upper(),
+            "number": m.group(2),
+            "year": int(m.group(3)),
+        }
+    return {}
+
+
 # ---------------------------------------------------------------------------
 # Strategi 2: Parse nama file
 # ---------------------------------------------------------------------------
@@ -149,7 +200,7 @@ def _from_filename(filename: str) -> dict:
 
     # Fallback: cari angka tahun dan nomor dari filename
     year_m = re.search(r'\b(19[5-9]\d|20[0-2]\d|2030)\b', name)
-    number_m = re.search(r'(?<!\d)[-_\s](\d{1,4})[-_\s]', name)
+    number_m = re.search(r'(?<!\d)[-_\\s](\d{1,4})[-_\\s]', name)
     if year_m:
         return {
             "year": int(year_m.group(1)),
@@ -212,8 +263,8 @@ def extract_title(text: str) -> str:
     # Strategi 2: Baris pertama yang cukup panjang dan bukan header standar
     skip_patterns = [
         r'^REPUBLIK', r'^MENTERI', r'^PERATURAN', r'^UNDANG-UNDANG',
-        r'^NOMOR\s', r'^TENTANG', r'^KEPUTUSAN', r'^INSTRUKSI',
-        r'^\d+$',  # page number
+        r'^NOMOR\\s', r'^TENTANG', r'^KEPUTUSAN', r'^INSTRUKSI',
+        r'^\\d+$',  # page number
     ]
     for line in lines:
         stripped = line.strip()

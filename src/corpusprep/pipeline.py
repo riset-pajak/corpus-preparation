@@ -10,8 +10,17 @@ from corpusprep.enrichment import classify_regulation, extract_topics
 from corpusprep.metadata import extract_identifier, extract_title
 
 
-def process_file(file_path: Path, processed_dir: str) -> "RegulationDoc":
-    """Proses satu file menjadi RegulationDoc."""
+def process_file(
+    file_path: Path,
+    processed_dir: str,
+    *,
+    raw_text_override: str | None = None,
+) -> "RegulationDoc":
+    """Proses satu file menjadi RegulationDoc.
+
+    ``raw_text_override`` memakai teks hasil ekstraksi yang sudah ada
+    (mis. dari data/processed/) sehingga PDF besar tidak diekstrak ulang.
+    """
     from corpusprep.models import RegulationDoc, Section
     from bs4 import BeautifulSoup
 
@@ -19,7 +28,9 @@ def process_file(file_path: Path, processed_dir: str) -> "RegulationDoc":
 
     # 1. Extract
     raw_text = ""
-    if ext == ".pdf":
+    if raw_text_override is not None:
+        raw_text = raw_text_override
+    elif ext == ".pdf":
         raw_text = extract_text_from_pdf(file_path)
     elif ext == ".docx":
         raw_text = extract_text_from_docx(file_path)
@@ -67,6 +78,13 @@ def process_file(file_path: Path, processed_dir: str) -> "RegulationDoc":
         source_path=str(file_path),
         source_type=file_path.suffix,
     )
+
+    # Dokumen tanpa teks berarti (PDF scan) atau tanpa identifier valid
+    # ditandai unparsed -- jangan pernah mengarang isi (AGENTS.md).
+    if not raw_text.strip():
+        doc.status = "unparsed"
+    elif not meta.get("number") and not sections:
+        doc.status = "unparsed"
 
     # 5. Save processed text
     out_path = Path(processed_dir) / f"{file_path.stem}.txt"

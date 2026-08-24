@@ -155,3 +155,56 @@ def test_title_short_lines_skipped():
 def test_title_empty():
     """Teks sangat pendek."""
     assert extract_title("Pasal 1") == ""
+
+
+# -------------------------------------------------------------------------
+# Preamble: nomor yang DIRUJUK di Menimbang tidak boleh jadi identitas
+# (regresi dari audit 2026-08-24: PMK 61/2026 terbaca UU-17/2006)
+# -------------------------------------------------------------------------
+
+def test_referenced_number_in_menimbang_is_ignored():
+    """PMK dicetak 'NOMOR 61 TAHUN 2026'; menimbang merujuk UU 17/2006."""
+    text = (
+        "PERATURAN MENTERI KEUANGAN REPUBLIK INDONESIA\n"
+        "NOMOR 61 TAHUN 2026\n"
+        "TENTANG\n"
+        "TATA CARA PEMANFAATAN TARIF BEA MASUK\n"
+        "\n"
+        "DENGAN RAHMAT TUHAN YANG MAHA ESA\n"
+        "MENTERI KEUANGAN REPUBLIK INDONESIA,\n"
+        "Menimbang : a. bahwa untuk memberikan kepastian hukum berdasarkan\n"
+        "Undang-Undang Nomor 17 TAHUN 2006 tentang Bea Masuk;\n"
+    )
+    result = extract_identifier(text, source_file="PMK-61-2026.pdf")
+    assert result["number"] == "61"
+    assert result["year"] == 2026
+    assert result["reg_type_short"] == "PMK"
+    assert result["full_identifier"] == "PMK-61/2026"
+
+
+def test_preamble_number_year_without_slash_format():
+    """Pola '<JENIS> NOMOR <n> TAHUN <tahun>' pada preamble."""
+    text = (
+        "KEPUTUSAN MENTERI KEUANGAN REPUBLIK INDONESIA\n"
+        "NOMOR 300 TAHUN 2025\n"
+        "TENTANG\n"
+        "PENUNJUKAN PPID\n"
+        "Menimbang : bahwa berdasarkan PERATURAN MENTERI KEUANGAN NOMOR 110/PMK.01/2022;\n"
+    )
+    result = extract_identifier(text, source_file="KMK-300-2025.pdf")
+    assert result["full_identifier"] == "KEP-300/2025" or (
+        result["number"] == "300" and result["year"] == 2025
+    )
+
+
+def test_bare_slash_number_in_web_detail_page():
+    """Halaman detail DJP: nomor tanpa kata 'NOMOR' (969/KMK.04/1983)."""
+    text = (
+        "Dokumen Peraturan | Direktorat Jenderal Pajak\n"
+        "Lompat ke isi utama\n"
+        "969/KMK.04/1983\n"
+        "PEDOMAN PENGHITUNGAN KREDIT PAJAK PERTAMBAHAN NILAI\n"
+        "Menimbang: bahwa dalam rangka melaksanakan ketentuan\n"
+    )
+    result = extract_identifier(text, source_file="PERATURAN-1983-12-31.html")
+    assert result["full_identifier"] == "KMK-969/1983"
