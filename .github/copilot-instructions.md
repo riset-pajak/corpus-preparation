@@ -42,6 +42,9 @@ src/corpusprep/
 | `riset-pajak process` | Jalankan pipeline lengkap; hasil di-upsert ke `data.db` |
 | `riset-pajak inspect [--raw]` | Statistik corpus / lihat file di data/raw/ |
 | `riset-pajak status` | Status ringkas pipeline |
+| `riset-pajak db-status` | Statistik database SQLite (total, jenis, status, topik) |
+| `riset-pajak db-search "query" [--year N]` | Pencarian LIKE di judul/identifier |
+| `riset-pajak db-get <ID> [--text]` | Detail regulasi + pasal-pasal |
 
 ## Metadata Extraction
 
@@ -64,8 +67,8 @@ Topik pajak: PPh, PPN, PPnBM, PBB, BPHTB, KUP, Bea Materai, DJP-Admin, Umum
   lalu me-replace sections/topics untuk dokumen yang sama.
 - Tabel aktif: `regulations`, `sections`, `topics` (+ index identifier/type/year/regulation).
 - **FTS5 belum diimplementasikan** -- jangan berasumsi tabel `_fts` ada.
-- Detail schema: lihat `SCHEMA.md`.
-- Sample DB yang di-commit: 110 regulations, 1.360 sections, 161 topics.
+|- Detail schema: lihat `SCHEMA.md`.
+|- Sample DB yang di-commit: 68 regulations, 1.630 sections, 157 topics.
 
 ## Testing
 
@@ -112,8 +115,8 @@ Sinkron dengan `TASKS.md` (Phase 2 sedang berjalan):
 - [x] JSONL + Markdown export
 - [x] Web ingest + crawler multi-sumber
 - [x] SQLite persistence dari `process`
-- [ ] Audit kualitas & deduplikasi hasil crawl
-- [ ] `db-status`, `db-search`, `db-get`
+- [x] Audit kualitas & deduplikasi hasil crawl
+- [x] `db-status`, `db-search`, `db-get`
 - [ ] SQLite FTS5
 - [ ] Test database & crawler (target ~40–45 test)
 - [ ] Vector store integration (ChromaDB/Faiss) -- Phase 3

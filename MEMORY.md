@@ -16,10 +16,11 @@ Corpus pipeline for tax regulation intelligence system.
 - `riset-pajak process` upserts regulations, sections, and topics into `data.db`
 - `riset-pajak crawl --source <name>` crawls configured source indexes
 - Supported sources: JDIH Kemenkeu, peraturan.go.id, Mahkamah Konstitusi, DDTC, and DJP
-- Sample database is committed with 110 regulations, 1,360 sections, and 161 topics
+- Sample database is committed with 68 regulations, 1,630 sections, and 157 topics
 - Database code lives in `src/corpusprep/database.py`
 - Active SQLite schema is only `regulations` + `sections` + `topics` (+ indexes); FTS5 is not implemented yet (short-term step 3)
 - `configs/sources.yaml` is gitignored; `riset-pajak init` creates a default config
+- CLI has 3 new inspection commands: `db-status`, `db-search`, `db-get`
 
 ## Lessons Learned
 - PDF extraction is unreliable; manual correction layer may be needed
