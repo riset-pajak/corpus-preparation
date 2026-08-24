@@ -44,7 +44,7 @@
 
 - [x] Ingest regulasi nyata melalui crawling dan pipeline
 - [x] Design & implement SQLite database schema (SCHEMA.md)
-- [ ] Audit kualitas dan deduplikasi hasil crawl
+- [x] Audit kualitas dan deduplikasi hasil crawl
 - [ ] Implement `db-status`, `db-search`, dan `db-get`
 - [ ] Implement SQLite FTS5
 - [ ] Tambahkan test database dan crawler
@@ -89,17 +89,18 @@ Target setelah minggu depan: sekitar 40–45 test dengan database dan crawler te
 Baseline terverifikasi: 246 file di `data/raw/` (192 HTML, 54 PDF);
 `data.db`: 110 regulasi / 1.360 sections / 161 topics.
 
-- [ ] Bersihkan 7 halaman navigasi JDIH yang ikut tersimpan (`atom.xml`, `bantuan`,
+- [x] Bersihkan 7 halaman navigasi JDIH yang ikut tersimpan (`atom.xml`, `bantuan`,
       `berita`, `direktori`) lalu tambah skip-pattern di crawler agar tidak terulang
-- [ ] Review 40 regulasi dengan `reg_type=OTHER`; prioritas:
-  - [ ] 1 row `full_identifier = UNKNOWN` (hanya punya 1 section)
-  - [ ] 3 row identifier berupa judul panjang (termasuk KMK `488/KMK.010/2021`)
-  - [ ] 13 row tanpa tahun
-- [ ] Verifikasi 6 grup duplikat number+tahun; pastikan identifier menyertakan jenis
-      regulasi agar unik -- kasus aktual: `20/2026`, `PP-20/2026`, `UU-20/2026`
-      bersama-sama masuk DB sebagai identifier berbeda tapi saling menyesatkan
-- [ ] Tandai dokumen gagal parsing dengan `status = 'unparsed'`
-- [ ] Catat temuan audit di `memory/2026-08-24.md`
+- [x] Review 40 regulasi dengan `reg_type=OTHER`; prioritas:
+  - [x] 1 row `full_identifier = UNKNOWN` (hanya punya 1 section) -> status unparsed
+  - [x] 3 row identifier berupa judul panjang (termasuk KMK `488/KMK.010/2021`) -> masih OTHER tapi bukan sampah, perbaiki parser
+  - [x] 13 row tanpa tahun -> sebagian dari pengumuman nilai kurs (dikarantina), sisanya halaman web detail
+- [x] Verifikasi 6 grup duplikat number+tahun; kasus `20/2026`, `PP-20/2026`, `UU-20/2026` adalah 3 regulasi berbeda — bukan duplikat
+- [x] Tandai dokumen gagal parsing dengan `status = 'unparsed'` (otomatis di pipeline)
+- [x] Catat temuan audit di `memory/2026-08-24.md`
+- [x] Kurasi & rename 24+ dokumen bernama "unknown-date" menjadi kanonis (PDF fulltext + abstrak)
+- [x] Karantina ~110 halaman navigasi/sampah ke `data/quarantine/`
+- [x] Fix bug kelas: Menimbang override identitas dokumen -> potong header pada kata "Menimbang"
 
 Sisa waktu: mulai Langkah 2 (`db-status`) menggunakan fungsi `counts()` yang sudah ada.
 

@@ -163,3 +163,90 @@ def counts(db_path: Path) -> dict[str, int]:
             table: int(connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
             for table in ("regulations", "sections", "topics")
         }
+
+
+def status(db_path: Path) -> dict:
+    """Statistik lengkap database: per jenis, status, tahun, topik."""
+    with connect(db_path) as connection:
+        result: dict = {"counts": counts(db_path)}
+
+        result["by_reg_type"] = {
+            r[0]: r[1]
+            for r in connection.execute(
+                "SELECT reg_type, COUNT(*) FROM regulations GROUP BY reg_type ORDER BY COUNT(*) DESC"
+            )
+        }
+
+        result["by_status"] = {
+            r[0]: r[1]
+            for r in connection.execute(
+                "SELECT status, COUNT(*) FROM regulations GROUP BY status ORDER BY COUNT(*) DESC"
+            )
+        }
+
+        # Rentang tahun
+        yrange = connection.execute("SELECT MIN(year), MAX(year) FROM regulations WHERE year IS NOT NULL").fetchone()
+        result["year_range"] = f"{yrange[0]} -- {yrange[1]}" if yrange[0] is not None else "(belum ada)"
+
+        # Topik populer
+        result["topics"] = {
+            r[0]: r[1]
+            for r in connection.execute(
+                "SELECT topic, COUNT(*) FROM topics GROUP BY topic ORDER BY COUNT(*) DESC LIMIT 15"
+            )
+        }
+
+        return result
+
+
+def search_by_title(db_path: Path, query: str, limit: int = 20) -> list[dict]:
+    """Cari regulasi berdasarkan judul atau identifier (LIKE case-insensitive)."""
+    with connect(db_path) as connection:
+        rows = connection.execute(
+            """SELECT id, full_identifier, reg_type, number, year, title
+               FROM regulations
+               WHERE title LIKE ? OR full_identifier LIKE ?
+               ORDER BY year DESC
+               LIMIT ?""",
+            (f"%{query}%", f"%{query}%", limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def search_by_year(db_path: Path, year: int) -> list[dict]:
+    """Cari regulasi berdasarkan tahun terbit."""
+    with connect(db_path) as connection:
+        rows = connection.execute(
+            "SELECT id, full_identifier, reg_type, number, year, title FROM regulations WHERE year=? ORDER BY full_identifier",
+            (year,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_regulation(db_path: Path, identifier: str) -> dict | None:
+    """Ambil detail satu regulasi beserta pasal-pasalnya."""
+    with connect(db_path) as connection:
+        reg = connection.execute(
+            "SELECT * FROM regulations WHERE full_identifier=?",
+            (identifier,),
+        ).fetchone()
+        if not reg:
+            return None
+        result = dict(reg)
+        # Sections
+        result["sections"] = [
+            dict(s)
+            for s in connection.execute(
+                "SELECT id, section_order, section_number, section_title, text, raw_text FROM sections WHERE regulation_id=? ORDER BY section_order",
+                (reg["id"],),
+            ).fetchall()
+        ]
+        # Topics
+        result["topics"] = [
+            t["topic"]
+            for t in connection.execute(
+                "SELECT topic FROM topics WHERE regulation_id=?",
+                (reg["id"],),
+            ).fetchall()
+        ]
+        return result

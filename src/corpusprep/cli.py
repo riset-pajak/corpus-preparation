@@ -456,5 +456,130 @@ def crawl(
         console.print(f"  [yellow]-[/] {message}")
 
 
+# ---- db-status -----------------------------------------------------------
+
+@main.command("db-status")
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def db_status(data_dir: str) -> None:
+    """Tampilkan statistik database SQLite secara lengkap."""
+    root = Path(data_dir).resolve()
+    db_path = root / "data.db"
+    if not db_path.exists():
+        console.print("[red]Database tidak ditemukan:[/] [cyan]data.db[/]")
+        return
+
+    from corpusprep.database import status as db_status_fn
+
+    info = db_status_fn(db_path)
+
+    table = Table(title="Database Status")
+    table.add_column("Metrik", style="cyan")
+    table.add_column("Nilai", justify="right")
+
+    for metric, value in [
+        ("Total regulasi", info["counts"]["regulations"]),
+        ("Total sections", info["counts"]["sections"]),
+        ("Total topics", info["counts"]["topics"]),
+        ("Rentang tahun", info["year_range"]),
+    ]:
+        table.add_row(metric, str(value))
+
+    console.print(table)
+
+    if info["by_reg_type"]:
+        t2 = Table(title="Per Jenis Regulasi")
+        t2.add_column("Jenis", style="cyan")
+        t2.add_column("Jumlah", justify="right")
+        for k, v in sorted(info["by_reg_type"].items()):
+            t2.add_row(k, str(v))
+        console.print(t2)
+
+    if info["by_status"]:
+        t3 = Table(title="Per Status")
+        t3.add_column("Status", style="cyan")
+        t3.add_column("Jumlah", justify="right")
+        for k, v in sorted(info["by_status"].items()):
+            t3.add_row(k, str(v))
+        console.print(t3)
+
+    if info["topics"]:
+        console.print("\n[bold]Topik:[/]")
+        for t, c in sorted(info["topics"].items(), key=lambda x: -x[1]):
+            console.print(f"  {t:20s}  {c}")
+
+
+# ---- db-search -----------------------------------------------------------
+
+@main.command("db-search")
+@click.argument("query")
+@click.option("--year", "-y", type=int, help="Filter berdasarkan tahun terbit")
+@click.option("--limit", default=20, show_default=True, type=click.IntRange(min=1), help="Maks hasil")
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def db_search(query: str, year: int | None, limit: int, data_dir: str) -> None:
+    """Cari regulasi berdasarkan judul atau identifier."""
+    root = Path(data_dir).resolve()
+    db_path = root / "data.db"
+    if not db_path.exists():
+        console.print("[red]Database tidak ditemukan.[/]")
+        return
+
+    from corpusprep.database import search_by_title
+
+    results = search_by_title(db_path, query, limit) if year is None else []
+    if year is not None:
+        from corpusprep.database import search_by_year
+        results = search_by_year(db_path, year)
+
+    if not results:
+        filter_msg = f" tahun={year}" if year else ""
+        console.print(f"[dim]Tidak ditemukan untuk '{query}'{filter_msg}[/]")
+        return
+
+    console.print(f"\n[bold]{len(results)} hasil:[/]\n")
+    for r in results:
+        ident = r['full_identifier'][:45].ljust(46)
+        title = (r['title'] or '')[:55]
+        console.print(f"  [cyan]{ident}[/] [{r['reg_type']}] {r.get('year','---')}: {title}")
+    console.print()
+
+
+# ---- db-get --------------------------------------------------------------
+
+@main.command("db-get")
+@click.argument("identifier")
+@click.option("--text/--no-text", default=False, help="Tampilkan isi pasal lengkap")
+@click.option("--dir", "data_dir", default=".", help="Direktori root proyek")
+def db_get(identifier: str, text: bool, data_dir: str) -> None:
+    """Lihat detail satu regulasi dan pasal-pasalnya."""
+    root = Path(data_dir).resolve()
+    db_path = root / "data.db"
+    if not db_path.exists():
+        console.print("[red]Database tidak ditemukan.[/]")
+        return
+
+    from corpusprep.database import get_regulation
+
+    reg = get_regulation(db_path, identifier)
+    if not reg:
+        console.print(f"[red]Regulasi tidak ditemukan:[/] [cyan]{identifier}[/]")
+        return
+
+    console.print(f"\n[cyan]{reg['full_identifier']}[/] ({reg['reg_type']})")
+    console.print(f"  Judul:   {reg['title']}")
+    console.print(f"  Tahun:   {reg['year'] or '(tidak ada)'}")
+    console.print(f"  Topik:   {', '.join(reg['topics']) if reg['topics'] else '-'}")
+    console.print(f"  Status:  {reg['status']}")
+    console.print(f"  Sections: {len(reg['sections'])}")
+    console.print()
+
+    if text:
+        for s in reg['sections']:
+            console.print(f"  [bold]{s['section_number']}[/] {s['section_title'] or ''}")
+            console.print(f"    {s['text'][:200]}{'...' if len(s['text']) > 200 else ''}")
+            console.print()
+    else:
+        console.print("  [dim]Gunakan --text untuk melihat isi pasal lengkap[/]\n")
+
+
 if __name__ == "__main__":
     main()
