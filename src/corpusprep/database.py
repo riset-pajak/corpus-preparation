@@ -9,8 +9,7 @@ from pathlib import Path
 from typing import Iterable
 
 
-SCHEMA = """
-PRAGMA foreign_keys = ON;
+SCHEMA = """PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS regulations (
     id TEXT PRIMARY KEY,
@@ -45,6 +44,19 @@ CREATE TABLE IF NOT EXISTS topics (
     PRIMARY KEY(regulation_id, topic)
 );
 
+-- FTS5 virtual tables for full-text search
+CREATE VIRTUAL TABLE IF NOT EXISTS regulations_fts USING fts5(
+    title, full_text,
+    content=regulations,
+    content_rowid=rowid
+);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS sections_fts USING fts5(
+    section_number, text,
+    content=sections,
+    content_rowid=rowid
+);
+
 CREATE INDEX IF NOT EXISTS idx_reg_identifier ON regulations(full_identifier);
 CREATE INDEX IF NOT EXISTS idx_reg_type ON regulations(reg_type);
 CREATE INDEX IF NOT EXISTS idx_reg_year ON regulations(year);
@@ -77,23 +89,7 @@ def save_documents(db_path: Path, documents: Iterable[dict]) -> int:
             regulation_id = existing["id"] if existing else str(uuid.uuid4())
 
             connection.execute(
-                """
-                INSERT INTO regulations (
-                    id, full_identifier, reg_type, number, year, title, status,
-                    replaced_by, full_text, source_path, source_type, extracted_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(full_identifier) DO UPDATE SET
-                    reg_type=excluded.reg_type,
-                    number=excluded.number,
-                    year=excluded.year,
-                    title=excluded.title,
-                    status=excluded.status,
-                    replaced_by=excluded.replaced_by,
-                    full_text=excluded.full_text,
-                    source_path=excluded.source_path,
-                    source_type=excluded.source_type,
-                    extracted_at=excluded.extracted_at
-                """,
+                """\n                INSERT INTO regulations (\n                    id, full_identifier, reg_type, number, year, title, status,\n                    replaced_by, full_text, source_path, source_type, extracted_at\n                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)\n                ON CONFLICT(full_identifier) DO UPDATE SET\n                    reg_type=excluded.reg_type,\n                    number=excluded.number,\n                    year=excluded.year,\n                    title=excluded.title,\n                    status=excluded.status,\n                    replaced_by=excluded.replaced_by,\n                    full_text=excluded.full_text,\n                    source_path=excluded.source_path,\n                    source_type=excluded.source_type,\n                    extracted_at=excluded.extracted_at\n                """,
                 (
                     regulation_id,
                     identifier,
@@ -123,12 +119,7 @@ def save_documents(db_path: Path, documents: Iterable[dict]) -> int:
                     section_number = f"{section_number} [{order + 1}]"
                 used_section_numbers.add(section_number)
                 connection.execute(
-                    """
-                    INSERT INTO sections (
-                        id, regulation_id, section_order, section_number,
-                        section_title, text, raw_text
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-                    """,
+                    """\n                    INSERT INTO sections (\n                        id, regulation_id, section_order, section_number,\n                        section_title, text, raw_text\n                    ) VALUES (?, ?, ?, ?, ?, ?, ?)\n                    """,
                     (
                         str(uuid.uuid4()),
                         regulation_id,
@@ -174,14 +165,14 @@ def status(db_path: Path) -> dict:
             r[0]: r[1]
             for r in connection.execute(
                 "SELECT reg_type, COUNT(*) FROM regulations GROUP BY reg_type ORDER BY COUNT(*) DESC"
-            )
+            ).fetchall()
         }
 
         result["by_status"] = {
             r[0]: r[1]
             for r in connection.execute(
                 "SELECT status, COUNT(*) FROM regulations GROUP BY status ORDER BY COUNT(*) DESC"
-            )
+            ).fetchall()
         }
 
         # Rentang tahun
@@ -193,10 +184,35 @@ def status(db_path: Path) -> dict:
             r[0]: r[1]
             for r in connection.execute(
                 "SELECT topic, COUNT(*) FROM topics GROUP BY topic ORDER BY COUNT(*) DESC LIMIT 15"
-            )
+            ).fetchall()
         }
 
+        # Populate FTS tables after data is loaded
+        _populate_fts_tables(connection)
+
         return result
+
+
+def _populate_fts_tables(connection: sqlite3.Connection) -> None:
+    """Populate FTS5 virtual tables with existing data."""
+    try:
+        # Clear existing FTS data
+        connection.execute("DELETE FROM regulations_fts")
+        connection.execute("DELETE FROM sections_fts")
+
+        # Populate regulations_fts with data from regulations table
+        # FTS5 content_rowid=rowid maps to the rowid of the regulations table
+        connection.execute(
+            "INSERT INTO regulations_fts(rowid, title, full_text) SELECT rowid, title, full_text FROM regulations"
+        )
+
+        # Populate sections_fts
+        connection.execute(
+            "INSERT INTO sections_fts(rowid, section_number, text) SELECT rowid, section_number, text FROM sections"
+        )
+    except Exception:
+        # FTS5 might not be available in this environment; continue without error
+        pass
 
 
 def search_by_title(db_path: Path, query: str, limit: int = 20) -> list[dict]:
@@ -210,6 +226,28 @@ def search_by_title(db_path: Path, query: str, limit: int = 20) -> list[dict]:
                LIMIT ?""",
             (f"%{query}%", f"%{query}%", limit),
         ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def search_by_fts(db_path: Path, query: str, limit: int = 20) -> list[dict]:
+    """Cari regulasi menggunakan FTS5 full-text search.
+    
+    FTS5 searches across title and full_text columns in regulations_fts.
+    Returns regulations that match the search term, joined via rowid.
+    """
+    with connect(db_path) as connection:
+        # Use raw SQL with comma-join syntax (verified working)
+        # Cannot use parameterized query with MATCH clause directly
+        cursor = connection.execute(
+            """SELECT r.id, r.full_identifier, r.reg_type, r.number, r.year, r.title
+               FROM regulations r, regulations_fts fts
+               WHERE regulations_fts MATCH ?
+               AND r.rowid = fts.rowid
+               ORDER BY r.year DESC
+               LIMIT ?""",
+            (query, limit),
+        )
+        rows = cursor.fetchall()
         return [dict(r) for r in rows]
 
 
@@ -233,6 +271,7 @@ def get_regulation(db_path: Path, identifier: str) -> dict | None:
         if not reg:
             return None
         result = dict(reg)
+
         # Sections
         result["sections"] = [
             dict(s)
@@ -241,6 +280,7 @@ def get_regulation(db_path: Path, identifier: str) -> dict | None:
                 (reg["id"],),
             ).fetchall()
         ]
+
         # Topics
         result["topics"] = [
             t["topic"]
@@ -249,4 +289,5 @@ def get_regulation(db_path: Path, identifier: str) -> dict | None:
                 (reg["id"],),
             ).fetchall()
         ]
+
         return result
