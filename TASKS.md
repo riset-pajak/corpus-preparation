@@ -37,6 +37,7 @@
 - [x] Schema validation via Pydantic models
 - [x] SQLite persistence melalui `data.db`
 - [x] 37 unit tests (36 passed + 1 skipped: pdfminer dep — expected)
+- [x] Web app verifikasi & editing database (`app.py`, Flask) -- DONE (2026-08-28)
 
 ---
 
@@ -50,6 +51,10 @@
   - `riset-pajak db-search "query"` -> pencarian LIKE di title/identifier (+ filter tahun via `--year`)
   - `riset-pajak db-get <ID>` -> detail regulasi + daftar pasal (+ full text via `--text`)
 - [x] Implement SQLite FTS5 -- DONE
+- [x] Web app verifikasi & editing database (`app.py`, Flask) -- DONE (2026-08-28)
+  - Dashboard dengan statistik total
+  - Daftar regulasi dengan FTS5 search, filter, pagination
+  - Detail regulasi, edit metadata, edit section/pasal, tambah/hapus topik
 - [ ] Tambahkan test database dan crawler
 - [ ] Tambahkan mode `process --only-new` dan `--force`
 - [ ] Tambahkan metadata `source_name`
@@ -107,9 +112,10 @@ Baseline terverifikasi: 246 file di `data/raw/` (192 HTML, 54 PDF);
 
 Sisa waktu: mulai Langkah 2 (`db-status`) menggunakan fungsi `counts()` yang sudah ada.
 
-## Catatan Status Dokumentasi (2026-08-27)
+## Catatan Status Dokumentasi (2026-08-28)
 
 - FTS5 sudah terimplementasi dan aktif (`regulations_fts` + `sections_fts`).
+- Web app verifikasi & editing database sudah tersedia (`app.py`, Flask, 6 template HTML + CSS).
 - `configs/sources.yaml` tidak di-commit (gitignore); jalankan `riset-pajak init` atau buat manual sebelum crawl.
 - Parser identifier belum menangani nomor dengan bidang non-numerik (`488/KMK.010/2026`, `34/MK/EF.2/2026`) -- masuk Langkah 1 (sudah dicatat di audit).
 - Struktur modul: `collectors/` untuk web ingestion & crawling, `processors/` untuk pipeline steps, `enrichers/` untuk enrichment helpers, `exporters/` untuk output writers. Folder `__init__.py` saat ini kosong.

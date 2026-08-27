@@ -259,6 +259,33 @@ Full-text search (FTS5) sudah terimplementasi melalui tabel virtual
 pytest tests/ -v
 ```
 
+## Web App -- Verifikasi & Editing Database
+
+Aplikasi web berbasis Flask untuk verifikasi dan editing database SQLite corpus perpajakan.
+
+```bash
+pip install flask        # atau: uv pip install flask
+python3 app.py           # jalankan di http://127.0.0.1:5000
+```
+
+### Fitur Web App
+
+| Halaman | URL | Deskripsi |
+|---------|-----|-----------|
+| Dashboard | `/` | Statistik total regulasi, sections, topik, breakdown per jenis |
+| Daftar Regulasi | `/regulations` | Pencarian FTS5, filter status/jenis, sorting, pagination 20/item |
+| Detail Regulasi | `/regulation/<ID>` | Metadata lengkap, semua pasal (accordion), manajemen topik |
+| Edit Regulasi | `/regulation/<ID>/edit` | Form edit metadata: jenis, nomor, tahun, judul, status, source |
+| Edit Section | `/section/<ID>/edit` | Form edit teks section: nomor, title, cleaned text, raw text |
+| Tambah/Hapus Topik | `/topic/<ID>/add`, `remove` | Kelola topik pajak per regulasi via POST |
+
+### Catatan
+
+- Semua data disimpan langsung ke `data.db` (auto-commit).
+- Tidak ada autentikasi -- gunakan untuk lingkungan lokal saja.
+- Template HTML menggunakan CSS internal (`static/style.css`).
+- Dependensi tambahan: `flask>=3.1`. Lihat `requirements-web.txt`.
+
 ## Langkah Selesai
 
 Berikut langkah-langkah jangka pendek yang telah diselesaikan:
@@ -360,5 +387,5 @@ FTS5: `regulations_fts` (title, full_text) + `sections_fts` (section_number, tex
 Test: 37 passed, 1 skipped (pdfminer dep — expected).
 
 ---
-**Status Terakhir:** 28 Agustus 2026, 14:30 SE Asia Standard Time (UTC+07:00)
+**Status Terakhir:** 28 Agustus 2026, SE Asia Standard Time (UTC+07:00)
 **Terakhir Diupdate:** 2026-08-28
