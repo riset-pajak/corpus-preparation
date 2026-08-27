@@ -1,7 +1,7 @@
 # SCHEMA.md -- Corpus & Database Schema
 
-**Last Updated:** 2026-08-20
-**Status:** SQLite lokal implemented; JSONL/Markdown tetap tersedia sebagai export audit dan review
+**Last Updated:** 2026-08-28
+**Status:** SQLite lokal + FTS5 implemented; JSONL/Markdown tersedia sebagai export audit dan review
 
 ---
 
@@ -74,7 +74,7 @@ Output `data/output/corpus.jsonl` -- satu dokumen per baris, serialized dari `Re
 
 ---
 
-## 3. SQLite Database Schema (Implemented -- tanpa FTS5)
+## 3. SQLite Database Schema (Implemented + FTS5)
 
 Untuk integrasi dengan telegram-bot (search, retrieval, cross-reference).
 
@@ -139,11 +139,10 @@ CREATE INDEX idx_reg_year ON regulations(year);
 CREATE INDEX idx_sections_regulation ON sections(regulation_id);
 ```
 
-**Catatan FTS5:** tabel virtual `regulations_fts` dan `sections_fts` dulunya
-didokumentasikan sebagai bagian dari schema, tetapi **belum diimplementasikan**
-di `src/corpusprep/database.py` maupun di `data.db` (tabel aktif hanya
-`regulations`, `sections`, dan `topics`). Implementasinya adalah Langkah 3
-pada rencana jangka pendek; desain tabel virtual yang akan dipakai:
+**Catatan FTS5:** Implementasi sudah selesai sejak Langkah 3 (2026-08-27). Tabel virtual
+`regulations_fts` dan `sections_fts` sudah aktif di `src/corpusprep/database.py` dan
+terisi otomatis saat `riset-pajak db-status` dipanggil melalui fungsi `_populate_fts_tables()`.
+FTS5 mengisi data dari tabel utama saat query status dijalankan, sehingga data selalu sinkron tanpa trigger tambahan.
 
 ```sql
 -- Text search pada title dan full text regulasi
@@ -198,11 +197,12 @@ Step 2: Ekstrak, clean, split, dan enrich menjadi `RegulationDoc`
 Step 3: Export audit ke `data/output/corpus.jsonl` dan `corpus.md`
 Step 4: Upsert ke `data.db` berdasarkan `full_identifier`
 Step 5: Replace sections/topics untuk dokumen yang sama
-Step 6: Verify row counts dengan query SQLite
+Step 6: Populate FTS5 tables via `_populate_fts_tables()` saat db-status dipanggil
+Step 7: Verify row counts dengan query SQLite
 
 Untuk migrasi JSONL lama secara manual, gunakan `import_jsonl` dari
-`src/corpusprep/database.py`. Database contoh yang di-commit berisi 110 regulasi,
-1.360 sections, dan 161 topics.
+`src/corpusprep/database.py`. Database saat ini berisi 74 regulasi,
+1.901 sections, dan 178 topics.
 ```
 
 ---

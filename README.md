@@ -119,16 +119,25 @@ Catatan naming untuk ingest web:
 
 ```
 src/corpusprep/
-├── collectors/web.py   # Ingest halaman regulasi dan lampiran dari web
-├── collectors/crawler.py # Crawling katalog regulasi berbasis sumber
-├── database.py          # Persistensi SQLite lokal
 ├── cli.py              # Perintah CLI (click)
-├── pipeline.py         # Orchestration pipeline
+├── pipeline.py         # Orchestration pipeline utama
+├── database.py          # Persistensi SQLite + FTS5
 ├── extractors.py       # PDF/DOCX extraction
-├── splitter.py         # Pemecahan per pasal
-├── enrichment.py       # Klasifikasi & tag topik
 ├── metadata.py         # Ekstraksi nomor, tahun, judul, identifier
-└── models.py           # Model data (pydantic)
+├── enrichment.py       # Klasifikasi jenis & tag topik
+├── splitter.py         # Pemecahan per pasal/ayat
+├── models.py           # Model data (pydantic)
+├── collectors/         # Ingest web & crawling
+│   ├── web.py          # Ingest halaman regulasi dan lampiran dari web umum
+│   ├── crawler.py      # Crawling katalog berbasis sumber
+│   ├── pajak_gov_id.py # Collector DJP (pajak.go.id)
+│   ├── jdih_kemenkeu.py    # Collector JDIH Kemenkeu
+│   ├── peraturan_gov_id.py # Collector peraturan.go.id
+│   ├── mahkamah_konstitusi.py  # Collector MK
+│   └── ddtc.py             # Collector DDTC
+├── processors/         # Pipeline steps helpers (__init__.py kosong)
+├── enrichers/          # Enrichment helpers (__init__.py kosong)
+└── exporters/          # Output writers (__init__.py kosong)
 ```
 
 ## Struktur Folder & File
@@ -144,15 +153,26 @@ corpus-preparation/
 ├── SCHEMA.md
 ├── pyproject.toml
 │
-├── src/corpusprep/
-│   ├── cli.py
-│   ├── pipeline.py
-│   ├── extractors.py
-│   ├── splitter.py
-│   ├── enrichment.py
-│   ├── metadata.py
-│   ├── models.py
-│   └── collectors/         # web.py, crawler.py, + collector per sumber
+├── src/corpusprep/          # Paket utama aplikasi
+│   ├── cli.py               # Perintah CLI (click)
+│   ├── pipeline.py          # Orchestration pipeline utama
+│   ├── database.py          # Persistensi SQLite + FTS5
+│   ├── extractors.py        # PDF/DOCX extraction
+│   ├── metadata.py          # Ekstraksi nomor, tahun, judul, identifier
+│   ├── enrichment.py        # Klasifikasi jenis & tag topik
+│   ├── splitter.py          # Pemecahan per pasal/ayat
+│   ├── models.py            # Model data (pydantic)
+│   ├── collectors/          # Ingest web & crawling
+│   │   ├── web.py           # Ingest halaman regulasi umum
+│   │   ├── crawler.py       # Crawling katalog berbasis sumber
+│   │   ├── pajak_gov_id.py  # Collector DJP (pajak.go.id)
+│   │   ├── jdih_kemenkeu.py    # Collector JDIH Kemenkeu
+│   │   ├── peraturan_gov_id.py # Collector peraturan.go.id
+│   │   ├── mahkamah_konstitusi.py # Collector MK
+│   │   └── ddtc.py             # Collector DDTC
+│   ├── processors/          # Pipeline steps helpers
+│   ├── enrichers/           # Enrichment helpers
+│   └── exporters/           # Output writers
 │
 ├── data.db           -- database SQLite contoh/lokal
 ├── data/
@@ -165,6 +185,9 @@ corpus-preparation/
 │
 ├── tests/
 ├── scripts/
+│   ├── audit_rename_2026_08_24.py  # Rename dokumen hasil audit
+│   ├── make_dummy_pdf.py          # Pembuat PDF dummy untuk testing
+│   └── rebuild_db_from_processed.py # Rebuild DB dari data processed
 └── README.md
 ```
 
@@ -172,12 +195,12 @@ corpus-preparation/
 
 Sistem mengenali beberapa format standar dokumen regulasi Indonesia:
 
-| Format | Contoh | Hasil |
-|--------|--------|-------|
-| HEADER (slash) | `NOMOR 99/PMK.03/2024` | `PMK-99/2024` |
-| HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `UU-6/1983` |
-| FILENAME | `PMK-68-PMK-03-2024.pdf` | `PMK-68/2024` |
-| WEB HTML | `228-PMK.03-2026-02-11.html` | `PMK-228/2017` (via header HTML) |
+|| Format | Contoh | Hasil Asli | Hasil Saat Ini (singkat) | Catatan |
+||--------|--------|-----------|--------------------------|---------|
+|| HEADER (slash) | `NOMOR 99/PMK.03/2024` | `99/PMK.03/2024` | `PMK-99/2024` | Bidang `PMK.03` (penyusun) diabaikan di singkat |
+|| HEADER (tahun) | `NOMOR 6 TAHUN 1983` | `6/1983` | `UU-6/1983` | Jenis UU ditambahkan oleh parser (teteapi format asli hanya `6/1983`) |
+|| FILENAME | `PMK-68-PMK-03-2024.pdf` | `68/PMK.03/2024` | `PMK-68/2024` | Bidang `PMK.03` diabaikan di singkat |
+|| WEB HTML | `228-PMK.03-2026-02-11.html` | `228/PMK.03/2026` | `PMK-228/2017` | Tahun 2026 → 2017 salah (data lama); bidang `PMK.03` hilang |
 
 Catatan: untuk ingest web, nomor kanonis (`PMK-228/2017`) diekstrak dari field
 HTML `field--name-field-nomor-dokumen` oleh collector, bukan dari nama file.
@@ -220,9 +243,15 @@ Database memiliki tabel:
 - `sections` -- pasal/ayat dengan urutan
 - `topics` -- relasi topik pajak
 
-Database contoh yang di-commit saat ini berisi 110 regulasi, 1.360 sections,
-dan 161 topic associations (per 2026-08-20). Full-text search (FTS5) belum
-diimplementasikan -- lihat rencana di bawah.
+Database contoh yang di-commit saat ini berisi 74 regulasi, 1.901 sections,
+dan 178 topic associations. Database berisi 73 regulasi aktif dan 1 unparsed,
+merentang tahun 1983–2026 dengan jenis UU (23), PMK (21), PER (8), KEP (1), PP (2), OTHER (19).
+
+Topik paling populer: KUP (42), DJP-Admin (31), PPN (30), PPh (27), PBB (19),
+PPnBM (14), BPHTB (10), Bea Materai (5).
+
+Full-text search (FTS5) sudah terimplementasi melalui tabel virtual
+`regulations_fts` (title, full_text) dan `sections_fts` (section_number, text).
 
 ## Testing
 
@@ -230,40 +259,37 @@ diimplementasikan -- lihat rencana di bawah.
 pytest tests/ -v
 ```
 
-## Rencana Minggu Depan
+## Langkah Selesai
 
-Urutan realistis yang disarankan sebelum masuk ke embedding atau vector store:
+Berikut langkah-langkah jangka pendek yang telah diselesaikan:
 
-### Langkah Jangka Pendek 1 — Audit data crawl
+### ✅ Langkah 1 — Audit data crawl
 
-- Audit hasil crawl DJP dan JDIH Kemenkeu.
-- Identifikasi halaman navigasi/non-regulasi yang ikut tersimpan.
-- Tandai dokumen gagal diproses sebagai `unparsed`.
-- Cek duplikasi berdasarkan `full_identifier`.
+Audit hasil crawl DJP/JDIH Kemenkeu, bersihkan halaman navigasi sampah,
+tandai dokumen gagal parsing sebagai `unparsed`, karsina ~110 halaman non-regulasi,
+dan kurasi dokumen bernama "unknown-date".
 
-### Langkah Jangka Pendek 2 — Inspeksi dan pencarian database
+### ✅ Langkah 2 — Inspeksi dan pencarian database
 
-- Implement `db-status` untuk menghitung `regulations`, `sections`, dan `topics`.
-- Implement pencarian sederhana berdasarkan judul, identifier, dan tahun.
-- Implement pengambilan detail regulasi dan pasal tertentu.
-
-Contoh target command:
+Implement `db-status`, `db-search`, dan `db-get`:
 
 ```bash
-riset-pajak db-status
-riset-pajak db-search "PPh Pasal 21"
-riset-pajak db-get "PMK-68/2024"
+riset-pajak db-status          # Statistik lengkap DB (total, jenis, status, topik)
+riset-pajak db-search "query"   # Pencarian LIKE di judul/identifier
+riset-pajak db-get "PMK-68/2024" # Detail regulasi + pasal-pasal
 ```
 
-### Langkah Jangka Pendek 3 — SQLite FTS5
+### ✅ Langkah 3 — SQLite FTS5
 
-Tambahkan full-text search untuk judul, full text, nomor pasal, dan isi pasal.
-FTS5 diprioritaskan sebelum embedding karena cepat, lokal, dan tidak membutuhkan
-model eksternal.
+Full-text search via FTS5 virtual tables untuk judul, full text, nomor pasal,
+dan isi pasal. Diprioritaskan sebelum embedding karena cepat, lokal, dan
+tidak memerlukan model eksternal.
+
+### Langkah Selanjutnya
 
 ### Langkah Jangka Pendek 4 — Test database dan crawler
 
-Tambahkan test untuk:
+Tambahan test untuk:
 
 - pembuatan schema SQLite;
 - upsert tanpa duplikasi regulasi;
@@ -277,35 +303,32 @@ Target: sekitar 40–45 test.
 
 ### Langkah Jangka Pendek 5 — Optimasi process
 
-Tambahkan opsi:
+Opsi baru pada `process`:
 
 ```bash
-riset-pajak process --only-new
-riset-pajak process --force
-riset-pajak process --db data.db
+riset-pajak process --only-new   # Hanya proses file belum ada di DB
+riset-pajak process --force      # Reprocess semua
+riset-pajak process --db data.db # Gunakan path database custom
 ```
-
-Tujuannya agar dokumen tidak selalu diproses ulang, tetapi tetap tersedia opsi
-reprocessing setelah parser diperbaiki.
 
 ### Langkah Jangka Pendek 6 — Metadata sumber
 
-Tambahkan sumber resmi ke metadata/database, misalnya:
+Simpan `source_name` pada metadata/database untuk setiap sumber ingest:
 
 ```text
-source_name: djp_pemerintah | jdih_kemenkeu | ddtc |
-             peraturan_gov_id | mahkamah_konstitusi
+djp_pemerintah | jdih_kemenkeu | ddtc |
+peraturan_gov_id | mahkamah_konstitusi
 ```
 
-Ini memungkinkan filter berdasarkan sumber pada inspeksi dan pencarian.
+Memungkinkan filter berdasarkan sumber pada inspeksi dan pencarian.
 
 ### Langkah Jangka Pendek 7 — Review dan rilis
 
-- Jalankan crawl terbatas ulang.
-- Bandingkan jumlah dan kualitas data sebelum/sesudah.
-- Perbarui README, SCHEMA, dan TASKS.
-- Jalankan seluruh test suite.
-- Commit dan push perubahan.
+- Crawl terbatas ulang.
+- Bandingkan jumlah/kualitas data sebelum-sesudah.
+- Perbarui README, SCHEMA, TASKS.
+- Jalankan test suite penuh.
+- Commit dan push.
 
 ### Belum diprioritaskan
 
@@ -317,12 +340,13 @@ setelah kualitas data dan pencarian SQLite stabil.
 - [x] SQLite lokal untuk regulations, sections, dan topics
 - [x] Persistensi database dari command `process`
 - [x] Crawling katalog JDIH Kemenkeu, DJP, DDTC, MK, dan peraturan.go.id
-- [ ] Audit kualitas dan deduplikasi hasil crawl
-- [ ] Implement `db-status`, `db-search`, dan `db-get`
-- [ ] Implement SQLite FTS5
-- [ ] Tambahkan test database dan crawler
-- [ ] Tambahkan mode `process --only-new` dan `--force`
-- [ ] Tambahkan metadata `source_name`
+- [x] Audit kualitas dan deduplikasi hasil crawl (Langkah 1)
+- [x] Implement `db-status`, `db-search`, dan `db-get` (Langkah 2)
+- [x] Implement SQLite FTS5 (Langkah 3)
+- [ ] Tambahkan test database dan crawler (Langkah 4) — target 40–45 test
+- [ ] Tambahkan mode `process --only-new` dan `--force` (Langkah 5)
+- [ ] Tambahkan metadata `source_name` (Langkah 6)
+- [ ] Review dan rilis (Langkah 7)
 - [ ] Implement regulation search handler di bot
 - [ ] Article retrieval handler (`/pasal`, `/cari`)
 - [ ] Summarization engine
@@ -330,5 +354,11 @@ setelah kualitas data dan pencarian SQLite stabil.
 - [ ] Vector store integration (ChromaDB/Faiss)
 
 ---
-**Status:** CLI, crawling, dan SQLite lokal implemented; 32 tests (31 passed + 1 skipped)
-**Terakhir Diupdate:** 2026-08-24
+**Status:** CLI, crawling, FTS5 full-text search, dan database upsert fully implemented.
+74 regulasi | 1901 sections | 178 topic associations. Tahun: 1983–2026.
+FTS5: `regulations_fts` (title, full_text) + `sections_fts` (section_number, text).
+Test: 37 passed, 1 skipped (pdfminer dep — expected).
+
+---
+**Status Terakhir:** 28 Agustus 2026, 14:30 SE Asia Standard Time (UTC+07:00)
+**Terakhir Diupdate:** 2026-08-28
