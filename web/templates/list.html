@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Regulasi - CorpusPrep{% endblock %}
+{% block content %}
+<h2>Regulasi</h2>
+
+<!-- Filter & Search -->
+<form method="get" class="filter-bar">
+  <input type="text" name="q" placeholder="Cari judul atau identifier..." value="{{ q }}">
+  
+  <select name="status">
+    <option value="">Semua Status</option>
+    {% for s in statuses %}
+      <option value="{{ s }}" {{ 'selected' if s == status_filter else '' }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  
+  <select name="type">
+    <option value="">Semua Jenis</option>
+    {% for t in types %}
+      <option value="{{ t }}" {{ 'selected' if t == type_filter else '' }}>{{ t }}</option>
+    {% endfor %}
+  </select>
+  
+  <select name="order">
+    <option value="year DESC" {{ 'selected' if request.args.get('order') == 'year DESC' }}>Tahun Tertinggi</option>
+    <option value="year ASC" {{ 'selected' if request.args.get('order') == 'year ASC' }}>Tahun Terendah</option>
+    <option value="reg_type" {{ 'selected' if request.args.get('order') == 'reg_type' }}>Jenis</option>
+    <option value="full_identifier" {{ 'selected' if request.args.get('order') == 'full_identifier' }}>Identifier</option>
+  </select>
+  
+  <button type="submit" class="btn btn-primary">Filter</button>
+  {% if q or status_filter or type_filter %}
+    <a href="{{ url_for('regulations_list') }}" class="btn">Reset</a>
+  {% endif %}
+</form>
+
+<div class="result-info">Menampilkan {{ regs|length }} dari {{ total }} regulasi</div>
+
+<!-- Table -->
+<table>
+  <thead>
+    <tr>
+      <th>Identifier</th>
+      <th>Jenis</th>
+      <th>Tahun</th>
+      <th>Status</th>
+      <th>Judul</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for r in regs %}
+    <tr>
+      <td><a href="{{ url_for('regulation_detail', reg_id=r['id']) }}">{{ r['full_identifier'][:30] if r['full_identifier'] else '(tidak ada)' }}</a></td>
+      <td><span class="badge badge-{{ r['reg_type'] }}">{{ r['reg_type'] }}</span></td>
+      <td>{{ r['year'] or '-' }}</td>
+      <td><span class="badge {{ 'badge-danger' if r['status'] == 'unparsed' else 'badge-success' }}">{{ r['status'] }}</span></td>
+      <td class="truncate">{{ r['title'][:80] if r['title'] else '-' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if pages_total > 1 %}
+<nav class="pagination">
+  {% if page > 1 %}
+    <a href="{{ url_for('regulations_list', page=page-1, **request.args) }}" class="btn">&laquo; Sebelumnya</a>
+  {% endif %}
+  
+  {% for p in range(1, pages_total + 1) %}
+    {% if p == 1 or p == pages_total or (p >= page - 2 and p <= page + 2) %}
+      <a href="{{ url_for('regulations_list', page=p, **request.args) }}" 
+         class="btn {{ 'btn-primary' if p == page else '' }}">{{ p }}</a>
+    {% elif p == page - 3 or p == page + 3 %}
+      <span class="page-dots">...</span>
+    {% endif %}
+  {% endfor %}
+  
+  {% if page < pages_total %}
+    <a href="{{ url_for('regulations_list', page=page+1, **request.args) }}" class="btn">Selanjutnya &raquo;</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

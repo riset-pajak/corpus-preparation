@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - CorpusPrep{% endblock %}
+{% block content %}
+<h2>Dashboard</h2>
+<div class="stats-grid">
+  <div class="stat-card stat-blue">
+    <h3>{{ total_reg }}</h3>
+    <p>Total Regulasi</p>
+  </div>
+  <div class="stat-card stat-green">
+    <h3>{{ total_sec }}</h3>
+    <p>Sections (Pasal)</p>
+  </div>
+  <div class="stat-card stat-orange">
+    <h3>{{ total_top }}</h3>
+    <p>Topic Associations</p>
+  </div>
+</div>
+
+<h3>Regulasi per Jenis</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Jenis</th>
+      <th>Jumlah</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in by_type %}
+    <tr>
+      <td>{{ row['reg_type'] }}</td>
+      <td style="text-align:right">{{ row['c'] }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+  <tfoot>
+    <tr class="foot-row">
+      <td>Total</td>
+      <td style="text-align:right">{{ total_reg }}</td>
+    </tr>
+  </tfoot>
+</table>
+
+<br>
+<p><a href="/regulations" class="btn btn-primary">Lihat Semua Regulasi &rarr;</a></p>
+{% endblock %}

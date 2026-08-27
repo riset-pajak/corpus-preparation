@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ reg.full_identifier[:40] if reg.full_identifier else 'Detail' }} - CorpusPrep{% endblock %}
+{% block content %}
+<div class="detail-header">
+  <h2>{{ reg.full_identifier[:50] if reg.full_identifier else 'Tanpa Identifier' }}</h2>
+  <span class="badge badge-{{ reg.reg_type }}">{{ reg.reg_type }}</span>
+</div>
+
+<!-- Metadata Grid -->
+<div class="meta-grid">
+  <div class="meta-item">
+    <label>Nomor</label>
+    <span>{{ reg.number or '-' }}</span>
+  </div>
+  <div class="meta-item">
+    <label>Tahun</label>
+    <span>{{ reg.year or '-' }}</span>
+  </div>
+  <div class="meta-item">
+    <label>Status</label>
+    <span class="badge {{ 'badge-danger' if reg.status == 'unparsed' else 'badge-success' }}">{{ reg.status }}</span>
+  </div>
+  <div class="meta-item">
+    <label>Diganti oleh</label>
+    <span>{{ reg.replaced_by or '-' }}</span>
+  </div>
+  <div class="meta-item">
+    <label>Source Path</label>
+    <span>{{ reg.source_path or '-' }}</span>
+  </div>
+  <div class="meta-item">
+    <label>Created</label>
+    <span>{{ reg.created_at or '-' }}</span>
+  </div>
+</div>
+
+<!-- Judul -->
+<div class="section-block">
+  <h3>Judul</h3>
+  <p>{{ reg.title or '(tidak ada judul)' }}</p>
+</div>
+
+<!-- Topics -->
+<div class="section-block">
+  <h3>Topik</h3>
+  {% if topics %}
+  <div class="topic-list">
+    {% for t in topics %}
+    <span class="topic-tag">
+      {{ t['topic'] }}
+      <form method="post" action="{{ url_for('topic_remove', reg_id=reg.id, topic=t['topic']) }}" style="display:inline">
+        <button type="submit" class="topic-remove-btn" title="Hapus topik">&times;</button>
+      </form>
+    </span>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty">Tidak ada topik</p>
+  {% endif %}
+  
+  <form method="post" action="{{ url_for('topic_add', reg_id=reg.id) }}" class="topic-form">
+    <input type="text" name="topic" placeholder="Tambah topik baru..." required>
+    <button type="submit" class="btn btn-small">+ Tambah</button>
+  </form>
+</div>
+
+<!-- Sections (Pasal-Pasal) -->
+<div class="section-block">
+  <h3>Sections ({{ sections|length }} pasal)</h3>
+  {% for s in sections %}
+  <details class="section-accordion">
+    <summary>
+      <strong>{{ s.section_number[:60] }}</strong>
+    </summary>
+    <div class="section-body">
+      {% if s.section_title %}
+      <div class="section-title">{{ s.section_title }}</div>
+      {% endif %}
+      <textarea class="editable-text" rows="6" disabled>{{ s.text }}</textarea>
+      <a href="/section/{{ s.id }}/edit" class="btn btn-small">Edit Section Ini</a>
+    </div>
+  </details>
+  {% endfor %}
+  
+  {% if not sections %}
+  <p class="empty">Belum ada section</p>
+  {% endif %}
+</div>
+
+<br>
+<a href="/regulations" class="btn">&laquo; Kembali ke Daftar</a>
+<a href="/regulation/{{ reg.id }}/edit" class="btn btn-warning">Edit Regulasi</a>
+{% endblock %}

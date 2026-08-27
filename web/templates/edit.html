@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Edit - {{ reg.full_identifier[:40] }} - CorpusPrep{% endblock %}
+{% block content %}
+<h2>Edit Regulasi</h2>
+
+<form method="post" class="edit-form">
+  <div class="form-group">
+    <label for="full_identifier">Full Identifier (Primary Key)</label>
+    <input type="text" id="full_identifier" name="full_identifier" value="{{ reg.full_identifier }}" disabled>
+    <small>Tidak dapat diubah</small>
+  </div>
+
+  <div class="form-group">
+    <label for="reg_type">Jenis Regulasi</label>
+    <select id="reg_type" name="reg_type">
+      {% for rt in ['UU','PP','PMK','PER','SE','KEP','INSTR','OTHER'] %}
+        <option value="{{ rt }}" {{ 'selected' if reg.reg_type == rt }}>{{ rt }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="number">Nomor</label>
+      <input type="text" id="number" name="number" value="{{ reg.number }}">
+    </div>
+    <div class="form-group">
+      <label for="year">Tahun</label>
+      <input type="number" id="year" name="year" value="{{ reg.year or '' }}">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="title">Judul</label>
+    <textarea id="title" name="title" rows="3">{{ reg.title }}</textarea>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option value="aktif" {{ 'selected' if reg.status == 'aktif' }}>Aktif</option>
+        <option value="unparsed" {{ 'selected' if reg.status == 'unparsed' }}>Unparsed</option>
+        <option value="cabut" {{ 'selected' if reg.status == 'cabut' }}>Cabut</option>
+        <option value="diganti" {{ 'selected' if reg.status == 'diganti' }}>Diganti</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="replaced_by">Diganti oleh (Identifier)</label>
+      <input type="text" id="replaced_by" name="replaced_by" value="{{ reg.replaced_by }}">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label for="source_path">Source Path</label>
+    <input type="text" id="source_path" name="source_path" value="{{ reg.source_path }}">
+  </div>
+
+  <div class="form-group">
+    <label for="source_type">Source Type</label>
+    <input type="text" id="source_type" name="source_type" value="{{ reg.source_type }}">
+  </div>
+
+  <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+  <a href="/regulation/{{ reg.id }}" class="btn">Batal</a>
+</form>
+{% endblock %}
