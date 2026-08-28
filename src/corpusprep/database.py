@@ -196,19 +196,22 @@ def status(db_path: Path) -> dict:
 def _populate_fts_tables(connection: sqlite3.Connection) -> None:
     """Populate FTS5 virtual tables with existing data."""
     try:
-        # Clear existing FTS data
-        connection.execute("DELETE FROM regulations_fts")
-        connection.execute("DELETE FROM sections_fts")
+        # Clear existing FTS data - recreate if needed
+        for table in ("regulations_fts", "sections_fts"):
+            try:
+                connection.execute(f"DELETE FROM {table}")
+            except Exception:
+                pass
 
         # Populate regulations_fts with data from regulations table
-        # FTS5 content_rowid=rowid maps to the rowid of the regulations table
+        # Use INSERT OR REPLACE to avoid issues with DELETE failures
         connection.execute(
-            "INSERT INTO regulations_fts(rowid, title, full_text) SELECT rowid, title, full_text FROM regulations"
+            "INSERT OR REPLACE INTO regulations_fts(rowid, title, full_text) SELECT rowid, title, full_text FROM regulations"
         )
 
         # Populate sections_fts
         connection.execute(
-            "INSERT INTO sections_fts(rowid, section_number, text) SELECT rowid, section_number, text FROM sections"
+            "INSERT OR REPLACE INTO sections_fts(rowid, section_number, text) SELECT rowid, section_number, text FROM sections"
         )
     except Exception:
         # FTS5 might not be available in this environment; continue without error
@@ -236,19 +239,32 @@ def search_by_fts(db_path: Path, query: str, limit: int = 20) -> list[dict]:
     Returns regulations that match the search term, joined via rowid.
     """
     with connect(db_path) as connection:
-        # Use raw SQL with comma-join syntax (verified working)
-        # Cannot use parameterized query with MATCH clause directly
-        cursor = connection.execute(
-            """SELECT r.id, r.full_identifier, r.reg_type, r.number, r.year, r.title
-               FROM regulations r, regulations_fts fts
-               WHERE regulations_fts MATCH ?
-               AND r.rowid = fts.rowid
-               ORDER BY r.year DESC
-               LIMIT ?""",
-            (query, limit),
-        )
-        rows = cursor.fetchall()
-        return [dict(r) for r in rows]
+        try:
+            # First get matching rowids from FTS
+            fts_rows = connection.execute(
+                "SELECT rowid FROM regulations_fts WHERE regulations_fts MATCH ?",
+                (query,)
+            ).fetchall()
+            
+            if not fts_rows:
+                return []
+            
+            # Then get regulation details for those rowids
+            placeholders = ",".join(["?"] * len(fts_rows))
+            reg_ids = [r["rowid"] for r in fts_rows]
+            
+            rows = connection.execute(
+                f"""SELECT id, full_identifier, reg_type, number, year, title
+                    FROM regulations
+                    WHERE rowid IN ({placeholders})
+                    ORDER BY year DESC
+                    LIMIT ?""",
+                [*reg_ids, limit],
+            ).fetchall()
+            return [dict(r) for r in rows]
+        except Exception:
+            # FTS5 might not be available; return empty
+            return []
 
 
 def search_by_year(db_path: Path, year: int) -> list[dict]:

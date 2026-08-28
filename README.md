@@ -314,9 +314,9 @@ tidak memerlukan model eksternal.
 
 ### Langkah Selanjutnya
 
-### Langkah Jangka Pendek 4 — Test database dan crawler
+### ✅ Langkah 4 — Test database dan crawler
 
-Tambahan test untuk:
+Tambahan test lengkap untuk:
 
 - pembuatan schema SQLite;
 - upsert tanpa duplikasi regulasi;
@@ -326,7 +326,8 @@ Tambahan test untuk:
 - retry, 403, timeout, dan error per halaman;
 - collector DJP dengan HTML/PDF mock.
 
-Target: sekitar 40–45 test.
+✅ **Selesai: 67 tests total (66 passed, 1 skipped pdfminer).** Target sebelumnya 40–45 terlampaui.
+Test files: `tests/test_database.py` (20 tests), `tests/test_crawler_detailed.py` (11 tests).
 
 ### Langkah Jangka Pendek 5 — Optimasi process
 
@@ -364,27 +365,27 @@ setelah kualitas data dan pencarian SQLite stabil.
 
 ## Next Steps
 
-- [x] SQLite lokal untuk regulations, sections, dan topics
-- [x] Persistensi database dari command `process`
-- [x] Crawling katalog JDIH Kemenkeu, DJP, DDTC, MK, dan peraturan.go.id
-- [x] Audit kualitas dan deduplikasi hasil crawl (Langkah 1)
-- [x] Implement `db-status`, `db-search`, dan `db-get` (Langkah 2)
-- [x] Implement SQLite FTS5 (Langkah 3)
-- [ ] Tambahkan test database dan crawler (Langkah 4) — target 40–45 test
-- [ ] Tambahkan mode `process --only-new` dan `--force` (Langkah 5)
-- [ ] Tambahkan metadata `source_name` (Langkah 6)
-- [ ] Review dan rilis (Langkah 7)
-- [ ] Implement regulation search handler di bot
-- [ ] Article retrieval handler (`/pasal`, `/cari`)
-- [ ] Summarization engine
-- [ ] Semantic search (embedding model)
-- [ ] Vector store integration (ChromaDB/Faiss)
+|- [x] SQLite lokal untuk regulations, sections, dan topics
+|- [x] Persistensi database dari command `process`
+|- [x] Crawling katalog JDIH Kemenkeu, DJP, DDTC, MK, dan peraturan.go.id
+|- [x] Audit kualitas dan deduplikasi hasil crawl (Langkah 1)
+|- [x] Implement `db-status`, `db-search`, dan `db-get` (Langkah 2)
+|- [x] Implement SQLite FTS5 (Langkah 3)
+|- [x] Tambahkan test database dan crawler (Langkah 4) — ✅ **67 tests passed**
+|- [ ] Tambahkan mode `process --only-new` dan `--force` (Langkah 5)
+|- [ ] Tambahkan metadata `source_name` (Langkah 6)
+|- [ ] Review dan rilis (Langkah 7)
+|- [ ] Implement regulation search handler di bot
+|- [ ] Article retrieval handler (`/pasal`, `/cari`)
+|- [ ] Summarization engine
+|- [ ] Semantic search (embedding model)
+|- [ ] Vector store integration (ChromaDB/Faiss)
 
 ---
-**Status:** CLI, crawling, FTS5 full-text search, dan database upsert fully implemented.
+**Status:** CLI, crawling, FTS5 full-text search, database upsert, dan test suite fully implemented.
 74 regulasi | 1901 sections | 178 topic associations. Tahun: 1983–2026.
 FTS5: `regulations_fts` (title, full_text) + `sections_fts` (section_number, text).
-Test: 37 passed, 1 skipped (pdfminer dep — expected).
+Test: 67 passed (1 skipped pdfminer dep — expected).
 
 ---
 **Status Terakhir:** 28 Agustus 2026, SE Asia Standard Time (UTC+07:00)

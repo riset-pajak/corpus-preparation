@@ -8,13 +8,14 @@
 ## Pipeline Stage: Extraction ✅
 - [x] PDF loader (pdfplumber)
 - [x] DOCX loader (python-docx)
-- [x] HTML loader untuk ingest web
+- [x] HTML loader untuk ingest web (BeautifulSoup)
 - [x] Raw text storage (data/processed/)
 
 ## Pipeline Stage: Cleaning ✅
-- [x] Remove artifacts (header/footer noise)
+- [x] Remove artifacts (header/footer noise, page numbers)
 - [x] Normalize whitespace & formatting
 - [x] Handle encoding issues
+- [x] Cut at "Menimbang" to prevent referenced number override
 
 ## Pipeline Stage: Structuring ✅
 - [x] Pasal detection (regex Pasal/ayat)
@@ -23,12 +24,12 @@
 - [x] Fallback paragraph splitting
 
 ## Pipeline Stage: Enrichment ✅
-- [x] Topic tagging (PPh, PPN, PPnBM, PBB, KUP, Bea Materai)
-- [x] Regulation type classification (UU, PMK, PP, PER, SE, KEP, INSTR)
-- [x] Metadata extraction (nomor, tahun, judul, identifier) - 3 strategi
+- [x] Topic tagging (PPh, PPN, PPnBM, PBB, KUP, Bea Materai, DJP-Admin, Umum)
+- [x] Regulation type classification (UU, PMK, PP, PER, SE, KEP, INSTR, OTHER)
+- [x] Metadata extraction (nomor, tahun, judul, identifier) - multi-strategy with bare-slash web
 - [x] Web source ingest via `riset-pajak add-url`
-- [x] Source-specific collectors: JDIH Kemenkeu, peraturan.go.id, MK, DDTC, DJP (`add-pajak-gov-id` untuk pajak.go.id)
-- [x] Automatic crawling via `riset-pajak crawl`
+- [x] Source-specific collectors: JDIH Kemenkeu, peraturan.go.id, MK, DDTC, DJP (`add-pajak-gov-id`)
+- [x] Automatic crawling via `riset-pajak crawl` with nav filter
 - [ ] Embedding -- Phase 3 project-level planned
 
 ## Pipeline Stage: Output ✅
@@ -36,7 +37,8 @@
 - [x] Markdown export (data/output/corpus.md)
 - [x] Schema validation via Pydantic models
 - [x] SQLite persistence melalui `data.db`
-- [x] 37 unit tests (36 passed + 1 skipped: pdfminer dep — expected)
+- [x] FTS5 full-text search (regulations_fts, sections_fts)
+- [x] 67 unit tests (66 passed + 1 skipped: pdfminer dep — expected)
 - [x] Web app verifikasi & editing database (`app.py`, Flask) -- DONE (2026-08-28)
 
 ---
@@ -50,12 +52,13 @@
   - `riset-pajak db-status` -> statistik lengkap DB (total, jenis, status, rentang tahun, topik)
   - `riset-pajak db-search "query"` -> pencarian LIKE di title/identifier (+ filter tahun via `--year`)
   - `riset-pajak db-get <ID>` -> detail regulasi + daftar pasal (+ full text via `--text`)
-- [x] Implement SQLite FTS5 -- DONE
+- [x] Implement SQLite FTS5 -- DONE (2026-08-27)
+  - Uses INSERT OR REPLACE for robust population
+  - Two-step search: MATCH on FTS table then IN lookup on regulations
 - [x] Web app verifikasi & editing database (`app.py`, Flask) -- DONE (2026-08-28)
   - Dashboard dengan statistik total
   - Daftar regulasi dengan FTS5 search, filter, pagination
   - Detail regulasi, edit metadata, edit section/pasal, tambah/hapus topik
-- [ ] Tambahkan test database dan crawler
 - [ ] Tambahkan mode `process --only-new` dan `--force`
 - [ ] Tambahkan metadata `source_name`
 - [ ] Implement regulation search handler di bot
@@ -67,7 +70,9 @@
 1. **✅ Langkah 1 — Audit data crawl:** selesai -- hasil DJP/JDIH diaudit, halaman non-regasi dibersihkan, dokumen unparsed ditandai, dan duplikasi `full_identifier` diperiksa.
 2. **✅ Langkah 2 — Inspeksi database:** selesai -- `riset-pajak db-status`, `db-search`, dan `db-get` tersedia untuk metadata, judul, tahun, dan pasal.
 3. **✅ Langkah 3 — FTS5:** selesai -- full-text search via FTS5 virtual tables untuk judul, full text, nomor pasal, dan isi pasal.
-4. **Langkah 4 — Testing:** tambah test schema, upsert, sections/topics, import JSONL, crawler limits, retry, 403, timeout, dan collector DJP (target 40–45 test). Saat ini 37 passed, 1 skipped.
+4. **✅ Langkah 4 — Testing:** selesai -- 67 tests written and passing (66 passed, 1 skipped pdfminer):
+   - `test_database.py`: 20 tests covering schema, upsert, sections, topics, import_jsonl, counts, status, search_by_title, search_by_year, get_regulation, FTS5
+   - `test_crawler_detailed.py`: 11 tests covering nav filter, link extraction, depth limit, retry logic, internal URL detection, regulation link detection
 5. **Langkah 5 — Optimasi process:** tambahkan `process --only-new`, `--force`, dan opsi `--db`.
 6. **Langkah 6 — Metadata sumber:** simpan `source_name` untuk DJP, JDIH Kemenkeu, DDTC, peraturan.go.id, dan MK.
 7. **Langkah 7 — Review dan rilis:** crawl terbatas, bandingkan hasil, update dokumentasi, jalankan test, commit, dan push.
@@ -90,32 +95,10 @@ Embedding, ChromaDB/Faiss, summarization, dan compliance reasoning ditunda sampa
 
 ## Validation Target
 
-Target setelah minggu depan: sekitar 40–45 test dengan database dan crawler tervalidasi. Saat ini 37 passed, 1 skipped.
+✅ **Ditargetkan 40–45 test** — saat ini **67 passed**, 1 skipped (pdfminer). Target terlampaui.
 
-## Todo Hari Ini (2026-08-24) -- Langkah 1: Audit data crawl
+## Next Steps Checklist
 
-Baseline terverifikasi: 246 file di `data/raw/` (192 HTML, 54 PDF);
-`data.db`: 110 regulasi / 1.360 sections / 161 topics.
-
-- [x] Bersihkan 7 halaman navigasi JDIH yang ikut tersimpan (`atom.xml`, `bantuan`,
-      `berita`, `direktori`) lalu tambah skip-pattern di crawler agar tidak terulang
-- [x] Review 40 regulasi dengan `reg_type=OTHER`; prioritas:
-  - [x] 1 row `full_identifier = UNKNOWN` (hanya punya 1 section) -> status unparsed
-  - [x] 3 row identifier berupa judul panjang (termasuk KMK `488/KMK.010/2021`) -> masih OTHER tapi bukan sampah, perbaiki parser
-  - [x] 13 row tanpa tahun -> sebagian dari pengumuman nilai kurs (dikarantina), sisanya halaman web detail
-- [x] Verifikasi 6 grup duplikat number+tahun; kasus `20/2026`, `PP-20/2026`, `UU-20/2026` adalah 3 regulasi berbeda — bukan duplikat
-- [x] Tandai dokumen gagal parsing dengan `status = 'unparsed'` (otomatis di pipeline)
-- [x] Catat temuan audit di `memory/2026-08-24.md`
-- [x] Kurasi & rename 24+ dokumen bernama "unknown-date" menjadi kanonis (PDF fulltext + abstrak)
-- [x] Karantina ~110 halaman navigasi/sampah ke `data/quarantine/`
-- [x] Fix bug kelas: Menimbang override identitas dokumen -> potong header pada kata "Menimbang"
-
-Sisa waktu: mulai Langkah 2 (`db-status`) menggunakan fungsi `counts()` yang sudah ada.
-
-## Catatan Status Dokumentasi (2026-08-28)
-
-- FTS5 sudah terimplementasi dan aktif (`regulations_fts` + `sections_fts`).
-- Web app verifikasi & editing database sudah tersedia (`app.py`, Flask, 6 template HTML + CSS).
-- `configs/sources.yaml` tidak di-commit (gitignore); jalankan `riset-pajak init` atau buat manual sebelum crawl.
-- Parser identifier belum menangani nomor dengan bidang non-numerik (`488/KMK.010/2026`, `34/MK/EF.2/2026`) -- masuk Langkah 1 (sudah dicatat di audit).
-- Struktur modul: `collectors/` untuk web ingestion & crawling, `processors/` untuk pipeline steps, `enrichers/` untuk enrichment helpers, `exporters/` untuk output writers. Folder `__init__.py` saat ini kosong.
+- [ ] **Langkah 5:** Implement `--only-new` (skip existing full_identifier), `--force` (reprocess all), `--db <path>`
+- [ ] **Langkah 6:** Tambah kolom `source_name` ke tabel regulations dan propagasi ke JSONL/model
+- [ ] **Langkah 7:** Crawl terbatas 1 sumber, bandingkan before/after, update README/SCHEMA/TASKS, `pytest`, commit, push
